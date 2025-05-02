@@ -1,0 +1,33 @@
+realm: land
+indicators:
+  snw_max:
+    base: snw_max
+    parameters:
+      freq: YS-AUG
+
+  snw_max_doy:
+    base: snw_max_doy_ufunc
+    parameters:
+      freq: YS-AUG
+
+  snw_season_start:
+    base: snw_season_start
+    parameters:
+      thresh: 4 kg m-2
+      window: 14
+      freq: YS-AUG
+
+  snw_season_end:
+    base: snw_season_end
+    parameters:
+      thresh: 4 kg m-2
+      window: 14
+      freq: YS-DEC
+
+  snw_season_length:
+    base: snw_season_length_two_freqs
+    parameters:
+      thresh: 4 kg m-2
+      window: 14
+      freq: YS-AUG
+      freq2: YS-DEC

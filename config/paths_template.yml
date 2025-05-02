@@ -1,0 +1,21 @@
+paths:
+  # general
+    execdir: /exec/edupuis
+    tankdir: /jarre/edupuis/tank
+    pdir: ${paths.execdir}/prj/PINS
+    tmpdir: ${paths.execdir}/tmp
+    catalogs: /tank/scenario/catalogues
+    # data
+    exec_wdir: ${paths.pdir}/workflow/output
+    workdir: ${paths.tankdir}/PINS/workflow/output
+    refdir: ${paths.pdir}/workflow/output/reference 
+    # dask, log, catalog
+    dask: ${paths.tmpdir}
+    logging: ${paths.pdir}/project/logger.log
+    project_catalog: ${paths.pdir}/workflow/project.json
+    # configs  
+    configdir: ${paths.pdir}/config
+    properties: ${paths.configdir}/properties.yml 
+    indicators: ${paths.configdir}/indicators.yml
+    extra_indicator: ${paths.configdir}/extra_indicator.yml
+    weightsdir: ${paths.exec_wdir}/gs_weight

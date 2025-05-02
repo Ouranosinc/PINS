@@ -1,0 +1,117 @@
+schemas:
+  schema:
+    folders:
+    - type
+    - processing_level
+    - - bias_adjust_project
+      - version
+    - mip_era
+    - activity
+    - domain
+    - institution
+    - source
+    - (driving_model)
+    - experiment
+    - member
+    - frequency
+    - variable
+    filename:
+    - variable
+    - frequency
+    - bias_adjust_project
+    - version
+    - mip_era
+    - activity
+    - domain
+    - institution
+    - source
+    - driving_model
+    - experiment
+    - member
+    - DATES
+  schema_no_var:
+    folders:
+    - type
+    - processing_level
+    - - bias_adjust_project
+      - version
+    - mip_era
+    - activity
+    - domain
+    - institution
+    - source
+    - (driving_model)
+    - experiment
+    - member
+    - frequency
+    filename:
+    - frequency
+    - bias_adjust_project
+    - version
+    - mip_era
+    - activity
+    - domain
+    - institution
+    - source
+    - driving_model
+    - experiment
+    - member
+    - DATES
+  schema_xrfreq:
+    folders:
+    - type
+    - processing_level
+    - - bias_adjust_project
+      - version
+    - mip_era
+    - activity
+    - domain
+    - institution
+    - source
+    - (driving_model)
+    - experiment
+    - member
+    - frequency
+    - variable
+    filename:
+    - variable
+    - xrfreq
+    - bias_adjust_project
+    - version
+    - mip_era
+    - activity
+    - domain
+    - institution
+    - source
+    - driving_model
+    - experiment
+    - member
+    - DATES
+  schema_xrfreq_no_var:
+    folders:
+    - type
+    - processing_level
+    - - bias_adjust_project
+      - version
+    - mip_era
+    - activity
+    - domain
+    - institution
+    - source
+    - (driving_model)
+    - experiment
+    - member
+    - frequency
+    filename:
+    - xrfreq
+    - bias_adjust_project
+    - version
+    - mip_era
+    - activity
+    - domain
+    - institution
+    - source
+    - driving_model
+    - experiment
+    - member
+    - DATES
