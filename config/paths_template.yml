@@ -1,7 +1,7 @@
 paths:
   # general
-    execdir: /exec/edupuis
-    tankdir: /jarre/edupuis/tank
+    execdir: /PATH/TO/EXEC
+    tankdir: /PATH/TO/BIG/DISK
     pdir: ${paths.execdir}/prj/PINS
     tmpdir: ${paths.execdir}/tmp
     catalogs: /tank/scenario/catalogues
