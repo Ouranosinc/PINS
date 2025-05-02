@@ -4,7 +4,7 @@ paths:
     tankdir: /PATH/TO/BIG/DISK
     pdir: ${paths.execdir}/prj/PINS
     tmpdir: ${paths.execdir}/tmp
-    catalogs: /tank/scenario/catalogues
+    catalogs: /PATH/TO/BIG/DISK2/scenario/catalogues
     # data
     exec_wdir: ${paths.pdir}/workflow/output
     workdir: ${paths.tankdir}/PINS/workflow/output
