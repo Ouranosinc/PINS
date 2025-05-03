@@ -46,25 +46,25 @@ dask:
     local_directory: *dask_dir
 
 
-logging:
-  formatters:
-    default:
-      format: '%(asctime)s %(levelname)-8s %(name)-15s %(message)s'
-      datefmt: '%Y-%m-%d %H:%M:%S'
-  handlers:
-    console:
-      class: logging.StreamHandler
-      formatter: default
-      level: INFO
-    file:
-      class: logging.FileHandler
-      formatter: default
-      level: DEBUG
-      filename: ${paths.logging}
-  loggers:
-    xscen:
-      level: INFO
-      handlers: [ file ]
+# logging:
+#   formatters:
+#     default:
+#       format: '%(asctime)s %(levelname)-8s %(name)-15s %(message)s'
+#       datefmt: '%Y-%m-%d %H:%M:%S'
+#   handlers:
+#     console:
+#       class: logging.StreamHandler
+#       formatter: default
+#       level: INFO
+    # file:
+    #   class: logging.FileHandler
+    #   formatter: default
+    #   level: DEBUG
+      # filename: ${paths.logging}
+  # loggers:
+  #   xscen:
+  #     level: INFO
+  #     handlers: [ file ]
 
 
 custom:
