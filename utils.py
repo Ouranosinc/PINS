@@ -15,11 +15,14 @@ def logger(message):
     print(f"{time.strftime('%H:%M:%S')} -- {message}")
 
 
-def check_existence_and_log(pcat, search_kws, verbose=False):
-    if (exists := pcat.exists_in_cat(**search_kws)) == False:
-        logger(search_kws)
-    elif verbose:
-        logger(f"already computed, skipping {search_kws}")
+def check_existence_and_log(pcat, target, overwrite=False):
+    if overwrite: 
+        logger(target)
+        return False
+    if (exists := pcat.exists_in_cat(**target)) == False:
+        logger( target)
+    else:
+        logger(f"already computed { target} ")
     return exists
 
 
@@ -45,13 +48,18 @@ def _add_defaults_save_kwargs(save_kwargs, cfg):
 def template_1d_func(pcat, id0, cfg, task, func, func_kwargs=None, save_kwargs=None):
     func_kwargs = func_kwargs or {}
     save_kwargs = _add_defaults_save_kwargs(save_kwargs, cfg)
-    id0 = id0 if isinstance(id0, dict) else {"id": id0}
+    if isinstance(id0, str): 
+        id0 = {"id": id0}
     with Client(**dask_kwargs) if cfg["dask"]["use_dask"] else nullcontext() as client:
-        target = {**id0, **cfg[task]["output"]}
-        if not save_kwargs["overwrite"] and check_existence_and_log(pcat, target):
-            logger(f"{target} already computed")
-            return
-        ds = pcat.search(**id0, **cfg[task]["input"]).to_dask(decode_time_delta=False)
+        if isinstance(id0, dict):
+            target = {**id0, **cfg[task]["output"]}
+            if check_existence_and_log(pcat, target, save_kwargs["overwrite"]):
+                return
+            ds = pcat.search(**id0, **cfg[task]["input"]).to_dask(decode_time_delta=False)
+        elif isinstance(id0, xr.Dataset): 
+            ds = id0
+        else: 
+            raise ValueError(f"id0 should be a `str`,`dict`, or `xr.Dataset`. Got {type(id0)}")
         ds = func(ds, cfg[task], **func_kwargs)
         ds = fill_cat_attrs(ds, cfg[task]["output"])
         save_tmp_update_path(ds, pcat=pcat, **save_kwargs)
@@ -65,8 +73,7 @@ def template_dict_func(pcat, id0, cfg, task, func, func_kwargs=None, save_kwargs
     id0 = id0 if isinstance(id0, dict) else {"id": id0}
     with Client(**dask_kwargs) if cfg["dask"]["use_dask"] else nullcontext() as client:
         target = {**id0, **cfg[task]["output"]}
-        if not save_kwargs["overwrite"] and check_existence_and_log(pcat, target):
-            logger(f"{target} already computed")
+        if check_existence_and_log(pcat, target, save_kwargs["overwrite"]):
             return
         dsd = pcat.search(**id0, **cfg[task]["input"]).to_dataset_dict()
         ds = func(dsd, cfg[task], **func_kwargs)

@@ -2,7 +2,6 @@ import utils as u
 import xscen as xs
 from copy import deepcopy
 
-
 def _individual_indicator(ds, cfg, ind):
     attrs = deepcopy(ds.attrs)
     _, out = xs.compute_indicators(
@@ -10,7 +9,6 @@ def _individual_indicator(ds, cfg, ind):
     ).popitem()
     out.attrs = {**attrs, **out.attrs}
     return out
-
 
 def individual_indicator(pcat, id0, cfg, task):
     mod = xs.indicators.load_xclim_module(**cfg[task]["load_xclim_module"])

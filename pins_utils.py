@@ -60,7 +60,7 @@ def decay_snow_season_end(
     previous_non_zero_values = snw.where(snw > 0).ffill(dim=dim)
     # The further you are from a previous non-zero value, the largest the decay exponent is
     # If you were already non-zero, the exponent is 0, you receive a factor of 1
-    decay_powers = rl._cumsum_reset_on_zero(xr.where(snw == 0, 1, 0), dim=dim)
+    decay_powers = rl._cumsum_reset(xr.where(snw == 0, 1, 0), dim=dim)
     # Apply decay factor (with appropriate power) on the non-zero values we just filled in place of zeroes
     decayed_da = previous_non_zero_values * (
         decay_factor ** (decay_powers.where(decay_powers > 0))
@@ -82,7 +82,7 @@ def decay_snow_season_end(
         )
         temp = xr.where((decayed_da > 0) & (run_lengths >= window_sse), 1, np.nan)
         temp = xr.where(temp.time.dt.dayofyear == 1, 0, temp)
-        temp = rl._cumsum_reset_on_zero(temp, dim=dim)
+        temp = rl._cumsum_reset(temp, dim=dim)
         temp = temp.where(temp == 1)
         temp = xr.where(snw > 0, 0, temp)
         mask = temp.ffill(dim=dim) == 1

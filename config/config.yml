@@ -6,6 +6,7 @@ project:
 
 workflow:
   jupy: True
+  # overwrite: True
   overwrite: False
 
 
@@ -165,6 +166,20 @@ extract:
   chunks: ${custom.chunks}
 
 
+rechunk:
+  dask_kwargs:
+    n_workers: 2
+    threads_per_worker: 4
+    memory_limit: 12GB
+    local_directory: *dask_dir
+  input:
+    processing_level: regridded
+  output:
+    processing_level: rechunked
+  chunks:
+    time: -1
+    lon: 30
+    lat: 30
 
 regrid:
   dask_kwargs:
@@ -188,31 +203,6 @@ regrid:
       method: bilinear
       skipna: True
     weights_location: ${paths.weightsdir}
-
-
-rechunk:
-  dask_kwargs:
-    n_workers: 2
-    threads_per_worker: 4
-    memory_limit: 12GB
-    local_directory: *dask_dir
-  input:
-    processing_level: regridded
-  output:
-    processing_level: rechunked
-  chunks:
-    x:
-      time: -1
-      x: 30
-      y: 30
-    lon:
-      time: -1
-      lon: 30
-      lat: 30
-    rlon:
-      time: -1
-      rlon: 30
-      rlat: 30
 
 io:
   rechunk:

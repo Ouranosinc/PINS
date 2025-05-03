@@ -1,7 +1,6 @@
 import utils as u
 from contextlib import nullcontext
 
-
 # just combine ... a bit different than templates, so no boilerplate this time
 def indicators(pcat, id0, cfg, task):
     save_kwargs = {
@@ -20,9 +19,8 @@ def indicators(pcat, id0, cfg, task):
                 decode_time_delta=False
             )
             target = {**id0f, **cfg[task]["output"]}
-            if not save_kwargs["overwrite"] and u.check_existence_and_log(pcat, target):
-                u.logger(f"{target} already computed")
-                continue
+            if u.check_existence_and_log(pcat, target, save_kwargs["overwrite"]):
+                return
             ds = u.fill_cat_attrs(ds, cfg[task]["output"])
             u.save_tmp_update_path(ds, pcat=pcat, **save_kwargs)
             if client:

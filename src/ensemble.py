@@ -20,8 +20,7 @@ def _ensemble(dsd, cfg):
 
 
 def ensemble(pcat, id0, cfg, task):
-    xrfreqs = set(pcat.search(**cfg[task]["input"]).df.xrfreq)
-    for xrfreq in xrfreqs:
+    for xrfreq in set(pcat.search(**cfg[task]["input"]).df.xrfreq):
         # at this point, id is not a unique identifier
         id0f = {"id": id0, "xrfreq": xrfreq}
         save_kwargs = {
