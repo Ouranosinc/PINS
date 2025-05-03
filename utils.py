@@ -10,6 +10,10 @@ from dask.distributed import Client
 from contextlib import nullcontext
 
 
+# =======================================================================================
+# Template functions: Manages I/O and dask clients
+# =======================================================================================
+
 # good ol' logger
 def logger(message):
     print(f"{time.strftime('%H:%M:%S')} -- {message}")
@@ -25,15 +29,6 @@ def check_existence_and_log(pcat, target, overwrite=False):
         logger(f"already computed { target} ")
     return exists
 
-
-def convert_cf_time(ds):
-    try:
-        ds["time"] = ds.indexes["time"].to_datetimeindex()
-    except:
-        ValueError
-    return ds
-
-
 def _add_defaults_save_kwargs(save_kwargs, cfg):
     save_kwargs = save_kwargs or {}
     save_kwargs_defaults = {
@@ -45,42 +40,39 @@ def _add_defaults_save_kwargs(save_kwargs, cfg):
     return {**save_kwargs_defaults, **save_kwargs}
 
 
-def template_1d_func(pcat, id0, cfg, task, func, func_kwargs=None, save_kwargs=None):
+def template_func(pcat, id0, cfg, task, func, input_type = "dataset", func_kwargs=None, save_kwargs=None):
     func_kwargs = func_kwargs or {}
     save_kwargs = _add_defaults_save_kwargs(save_kwargs, cfg)
-    if isinstance(id0, str): 
-        id0 = {"id": id0}
+    if isinstance(id0, xr.Dataset):
+        if input_type != "dataset":
+            raise ValueError(f"If `id0` is a xr.Dataset, `input_type` should be 'dataset'. Got {input_type}")
+        input = id0
+    else: 
+        id0 = id0 if isinstance(id0, dict) else {"id": id0}
+        if check_existence_and_log(pcat, {**id0, **cfg[task]["output"]}, save_kwargs["overwrite"]):
+            return
+        cat = pcat.search(**id0, **cfg[task]["input"])
+        if input_type == "dataset": 
+            input = cat.to_dask(decode_time_delta=False)
+        elif input_type == "dict": 
+            input = cat.to_dataset_dict(decode_time_delta=False)
+        elif input_type == "cat": 
+            input = cat
     with Client(**dask_kwargs) if cfg["dask"]["use_dask"] else nullcontext() as client:
-        if isinstance(id0, dict):
-            target = {**id0, **cfg[task]["output"]}
-            if check_existence_and_log(pcat, target, save_kwargs["overwrite"]):
-                return
-            ds = pcat.search(**id0, **cfg[task]["input"]).to_dask(decode_time_delta=False)
-        elif isinstance(id0, xr.Dataset): 
-            ds = id0
-        else: 
-            raise ValueError(f"id0 should be a `str`,`dict`, or `xr.Dataset`. Got {type(id0)}")
-        ds = func(ds, cfg[task], **func_kwargs)
+        ds = func(input, cfg[task], **func_kwargs)
         ds = fill_cat_attrs(ds, cfg[task]["output"])
         save_tmp_update_path(ds, pcat=pcat, **save_kwargs)
         if client:
             client.close()
 
+def template_1d_func(pcat, id0, cfg, task, func, func_kwargs=None, save_kwargs=None):
+    return template_func(pcat, id0, cfg, task, func, input_type ="dataset", func_kwargs=None, save_kwargs=None)
 
 def template_dict_func(pcat, id0, cfg, task, func, func_kwargs=None, save_kwargs=None):
-    func_kwargs = func_kwargs or {}
-    save_kwargs = _add_defaults_save_kwargs(save_kwargs, cfg)
-    id0 = id0 if isinstance(id0, dict) else {"id": id0}
-    with Client(**dask_kwargs) if cfg["dask"]["use_dask"] else nullcontext() as client:
-        target = {**id0, **cfg[task]["output"]}
-        if check_existence_and_log(pcat, target, save_kwargs["overwrite"]):
-            return
-        dsd = pcat.search(**id0, **cfg[task]["input"]).to_dataset_dict()
-        ds = func(dsd, cfg[task], **func_kwargs)
-        ds = fill_cat_attrs(ds, cfg[task]["output"])
-        save_tmp_update_path(ds, pcat=pcat, **save_kwargs)
-        if client:
-            client.close()
+    return template_func(pcat, id0, cfg, task, func, input_type = "dict", func_kwargs=None, save_kwargs=None)
+
+def template_cat_func(pcat, id0, cfg, task, func, func_kwargs=None, save_kwargs=None):
+    return template_func(pcat, id0, cfg, task, func, input_type = "cat", func_kwargs=None, save_kwargs=None)
 
 
 def template_2d_func(
@@ -102,72 +94,6 @@ def template_2d_func(
         save_tmp_update_path(ds, pcat=pcat, **save_kwargs)
         if client:
             client.close()
-
-
-# def template_dict_func(pcat, id0, cfg, task, func, func_kwargs = None, save_kwargs = None):
-#     func_kwargs = func_kwargs or {}
-#     save_kwargs = _add_defaults_save_kwargs(save_kwargs , cfg)
-#     id0 = id0 if isinstance(id0, dict) else {"id":id0}
-#     with Client(**dask_kwargs) if cfg["dask"]["use_dask"] else nullcontext() as client:
-#         target = {**id0, **cfg[task]["output"]}
-#         if not save_kwargs["overwrite"] and check_existence_and_log(pcat, target):
-#             logger(f"{target} already computed")
-#             return
-#         dsd = pcat.search(**id0, **cfg[task]["input"]).to_dataset_dict()
-#         ds = func(dsd, cfg[task], **func_kwargs)
-#         ds = fill_cat_attrs(ds, cfg[task]["output"])
-#         save_tmp_update_path(ds, pcat=pcat, **save_kwargs)
-#         if client:
-#             client.close()
-
-
-def template_debug(pcat, id0, cfg, task, func, overwrite=False, **kwargs):
-    with Client(**dask_kwargs) if cfg["dask"]["use_dask"] else nullcontext() as client:
-        target = {"id": id0, **cfg[task]["output"]}
-        if not overwrite and u.check_existence_and_log(pcat, target):
-            u.logger(f"{target} already computed")
-            return
-        ds = pcat.search(id=id0, **cfg[task]["input"]).to_dask()
-        ds = func(ds, cfg[task], **kwargs)
-        if client:
-            client.close()
-        return ds
-
-
-# =======================================================================================
-# combine DataArray utils
-# =======================================================================================
-def cbc(dsl):
-    ds = dsl[0]
-    for dsi in dsl[1:]:
-        ds = ds.combine_first(dsi)
-    return ds
-
-
-def cbcl(dsl, lab="_combine_dim"):
-    if isinstance(dsl, dict):
-        out = cbc([ds.expand_dims({lab: [k]}) for k, ds in dsl.items()])
-    if isinstance(dsl, list):
-        out = cbc([ds.expand_dims({lab: [k]}) for k, ds in zip(*dsl)])
-    return out
-
-
-def get_common_dict(dsl):
-    ll = [list(i.attrs.keys()) for i in list(dsl)]
-    # flatten
-    ll = list(itertools.chain.from_iterable(ll))
-    all_keys = set(ll)
-    keys = []
-    for k in list(all_keys):
-        ll = [i.attrs.get(k, None) for i in list(dsl)]
-        # work-around to use set, need unmutable objects
-        ll = [tuple(i) if isinstance(i, list) else i for i in ll]
-        s = set(ll)
-        if len(s) == 1:
-            keys.append(k)
-    ind0 = list(dsl)[0]
-    return {k: v for k, v in ind0.attrs.items()}
-
 
 # =======================================================================================
 # pcat, gen utls
@@ -286,6 +212,15 @@ def intake_to_cat(ds):
                     pass
     return ds
 
+# =======================================================================================
+# saving utils
+# =======================================================================================
+def convert_cf_time(ds):
+    try:
+        ds["time"] = ds.indexes["time"].to_datetimeindex()
+    except:
+        ValueError
+    return ds
 
 def rem_encoding(ref):
     for v in ref.data_vars:
@@ -318,6 +253,8 @@ def rem_all_chunks(ds):
         except:
             pass
     return ds
+
+
 
 
 def move_then_delete(dirs_to_delete, moving_files, pcat):
@@ -412,56 +349,36 @@ def save_tmp_update_path(
         )
 
 
-def process_level(
-    ds0,
-    func,
-    kwargs,
-    chunks,
-    pcat,
-    lev0,
-    out_dir,
-    key,
-    extra_lab=None,
-    extra_fields=None,
-    move_and_delete=[],
-):
-    """
-    process
+# =======================================================================================
+# combine DataArray utils
+# =======================================================================================
+def cbc(dsl):
+    ds = dsl[0]
+    for dsi in dsl[1:]:
+        ds = ds.combine_first(dsi)
+    return ds
 
-    Parameters
-    ----------
-        move_and_delete: tuple[Str, Str]
-            Original dir and new dir
-    """
-    logger(key)
-    ds0 = func(ds0, **kwargs)
-    if isinstance(ds0, tuple) is False:
-        ds0 = (ds0,)
-    if isinstance(lev0, tuple) is False:
-        if lev0 is not None:
-            lev0 = (lev0,)
-        else:
-            lev0 = [None] * len(ds0)
-    if len(ds0) != len(lev0):
-        raise ValueError("`lev` and the output of func(`ds`) do not have equal length")
 
-    for ds, lev in zip(ds0, lev0):
-        filename = get_filename(ds, out_dir, extra_fields)
-        print(filename)
-        rem_zarr(filename)
-        logger("File removed")
-        if "target_mb" in chunks.keys():
-            chunks = xs.io.estimate_chunks(
-                ds, dims=chunks["dims"], target_mb=chunks["target_mb"]
-            )
-        ds = rem_all_chunks(ds)
-        ds = ds.chunk(chunks)
-        # xs.save_to_zarr(ds, filename, rechunk=chunks,  mode='o')
-        xs.save_to_zarr(ds, filename, mode="o")
-        logger("File saved")
-        pcat.update_from_ds(ds=ds, path=filename)
-        if len(move_and_delete) == 2:
-            xs.scripting.move_and_delete(
-                [[filename, filename.replace(move_and_delete[0], move_and_delete[1])]],
-                pcat,
-            )
+def cbcl(dsl, lab="_combine_dim"):
+    if isinstance(dsl, dict):
+        out = cbc([ds.expand_dims({lab: [k]}) for k, ds in dsl.items()])
+    if isinstance(dsl, list):
+        out = cbc([ds.expand_dims({lab: [k]}) for k, ds in zip(*dsl)])
+    return out
+
+
+def get_common_dict(dsl):
+    ll = [list(i.attrs.keys()) for i in list(dsl)]
+    # flatten
+    ll = list(itertools.chain.from_iterable(ll))
+    all_keys = set(ll)
+    keys = []
+    for k in list(all_keys):
+        ll = [i.attrs.get(k, None) for i in list(dsl)]
+        # work-around to use set, need unmutable objects
+        ll = [tuple(i) if isinstance(i, list) else i for i in ll]
+        s = set(ll)
+        if len(s) == 1:
+            keys.append(k)
+    ind0 = list(dsl)[0]
+    return {k: v for k, v in ind0.attrs.items()}

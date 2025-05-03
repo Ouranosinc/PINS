@@ -18,7 +18,6 @@ def _ensemble(dsd, cfg):
         dsd[k] = pu.days_since_to_doy(dsd[k])
     return xs.ensembles.ensemble_stats(datasets=dsd, **cfg["ensemble_stats"])
 
-
 def ensemble(pcat, id0, cfg, task):
     for xrfreq in set(pcat.search(**cfg[task]["input"]).df.xrfreq):
         # at this point, id is not a unique identifier
@@ -27,4 +26,5 @@ def ensemble(pcat, id0, cfg, task):
             "schemas": cfg["schemas"]["schema_xrfreq_no_var"],
             "simple_saving": True,
         }
+        # could also be a template_cat_func
         u.template_dict_func(pcat, id0f, cfg, task, _ensemble, save_kwargs=save_kwargs)

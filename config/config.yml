@@ -6,8 +6,8 @@ project:
 
 workflow:
   jupy: True
-  # overwrite: True
-  overwrite: False
+  overwrite: True
+  # overwrite: False
 
 
 tasks:

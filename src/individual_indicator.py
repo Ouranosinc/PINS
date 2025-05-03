@@ -4,6 +4,7 @@ from copy import deepcopy
 
 def _individual_indicator(ds, cfg, ind):
     attrs = deepcopy(ds.attrs)
+    # hard-coded 365-day on indicators, I think this is fine
     _, out = xs.compute_indicators(
         ds.convert_calendar("365_day", align_on="date"), indicators=[ind]
     ).popitem()
