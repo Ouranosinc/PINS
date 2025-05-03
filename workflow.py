@@ -31,8 +31,6 @@ from xscen import (
     measure_time, send_mail, send_mail_on_exit, timeout, TimeoutException,
     clean_up
 )
-from omegaconf import OmegaConf
-from datetime import datetime
 import utils as u 
 from src import rechunk, regrid, decay, train, adjust, extract,  individual_indicator, indicators, climatology, ensemble
 import importlib 
@@ -57,7 +55,6 @@ pcat = ProjectCatalog(PATHS['project_catalog'])
 # get sim_ids, if they exist (only works if extraction
 s_ids  = list(pcat.search(processing_level="extracted", type="simulation").df.id)
 id0 = None if len(s_ids)==0 else s_ids[0]  # interactive debugging
-
 
 
 # %% [markdown]
@@ -91,11 +88,6 @@ if instance(slice("1950", "1980")
 
 # %%
 # to be done
-
-
-# %%
-# u._delete_kws_(pcat, {"processing_level":"regridded"})
-pcat.search(processing_level="regridded").to_dask()
 
 
 # %% [markdown]
