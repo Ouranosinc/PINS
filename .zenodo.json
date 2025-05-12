@@ -1,0 +1,51 @@
+{
+  "title": "PINS: Bias-adjusted projections of snow cover over the Quebec Province using an ensemble of regional climate models",
+  "creators": [
+    {
+      "name": "Dupuis, Éric",
+      "affiliation": "Ouranos, Montréal, Québec, Canada",
+      "orcid": "0000-0001-7976-4596"
+    },
+    {
+      "name": "Bresson, Émilie",
+      "affiliation": "Ouranos, Montréal, Québec, Canada",
+      "orcid": "0000-0002-5289-4937"
+    },
+    {
+      "name": "Bourgault, Pascal",
+      "affiliation": "Ouranos, Montréal, Québec, Canada",
+      "orcid": "0000-0003-1192-0403"
+    }
+  ],
+  "license": "CC-BY-4.0",
+  "language": "eng",
+  "communities": [
+    {
+      "identifier": "ouranos"
+    }
+  ],
+  "upload_type": "software",
+  "access_right": "open",
+  "related_identifiers": [
+    {
+      "scheme": "doi",
+      "identifier": "10.5065/D6SJ1JCH",
+      "relation": "isDerivedFrom",
+      "resource_type": "dataset"
+    }
+  ],
+  "keywords": [
+    "snow",
+    "snow cover",
+    "snow water equivalent",
+    "quantile mapping",
+    "Quebec",
+    "bias adjustment",
+    "bias correction",
+    "CORDEX",
+    "climate",
+    "climatology",
+    "climate change",
+    "climate indicators",
+  ]
+}
