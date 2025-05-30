@@ -4,4 +4,5 @@ jupytext
 git+https://github.com/Ouranosinc/xsdba.git@speed-up-import
 git+https://github.com/Ouranosinc/xclim.git@split_sdba
 git+https://github.com/Ouranosinc/xscen.git@use_omegaconf
-# flake8
+jupyterlab_darkside_theme
+jupyterlab

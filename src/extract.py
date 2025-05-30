@@ -1,33 +1,31 @@
+
 import utils as u
 from dask.distributed import Client
 from contextlib import nullcontext
 from xscen import search_data_catalogs
 
+def _extract(ds, cfg): 
+    out = ds.convert_calendar("365_day")
+    out["time"] = out.time.astype("datetime64[ns]")
+    out = out.chunk(cfg["chunks"])
+    return out
 
-# loads from catalogs and not pcat, so a bit different than other boilplates functions
-# explicit implementation of utils.template_1d_func
-def extract_reference(pcat, cfg, task):
-    overwrite = cfg["workflow"]["overwrite"]
-    # task = extract.reference
-    with Client(**dask_kwargs) if cfg["dask"]["use_dask"] else nullcontext() as client:
-        cat_ref = search_data_catalogs(**u.nget(cfg, f"{task}.search_data_catalogs"))
-        id0, dc = cat_ref.popitem()
-        target = {"id": id0, **u.nget(cfg, f"{task}.output")}
-        if not cfg["custom"]["overwrite"] and u.check_existence_and_log(pcat, target):
-            u.logger(f"{target} already computed")
-            return
-        ds_ref = extract_dataset(catalog=dc, **u.nget(cfg, f"{task}.extract_dataset"))[
-            "D"
-        ]
-        ds_ref = ds_ref.chunk({d: cfg[task]["chunks"][d] for d in ds_ref.dims})
-        ds_ref = u.fill_cat_attrs(ds_ref, u.nget(cfg, f"{task}.output"))
-        u.save_tmp_update_path(
-            ds_ref,
-            schemas=cfg["schemas"]["schema"],
-            pcat=pcat,
-            save_dir=cfg["paths"]["exec_wdir"],
-            tmp_dir=None,
-            overwrite=cfg["custom"]["overwrite"],
-        )
-        if client:
-            client.close()
+def extract(pcat, cfg, task):
+    cat_sim = search_data_catalogs(**(cfg[task]["search_data_catalogs"]))
+    for sim_id, dc_id in cat_sim.items():
+        for region_name, region_dict in cfg['custom']['regions'].items():
+            save_kwargs = {**cfg["save_kwargs"], **(cfg[task].get("save_kwargs",{})), "simple_saving":True}
+            with Client(**(u.nget(cfg, f"{task}.dask_kwargs"))) if cfg["dask"]["use_dask"] else nullcontext() as client:
+                target = {"id": sim_id, **cfg[task]["output"]}
+                if u.check_existence_and_log(pcat, target, save_kwargs["overwrite"]):
+                    return
+                ds_sim = extract_dataset(catalog=dc_id, **(cfg[task]["extract_dataset"]), region=region_dict)['D']
+                out = _extract(ds_sim, cfg[task])
+                
+                out = u.intake_to_cat(out)
+                out = u.fill_cat_attrs(out, cfg["cat_attrs"])
+                out = u.fill_cat_attrs(out, cfg[task]["output"])
+                
+                u.save_tmp_update_path(out, pcat, **save_kwargs)
+                if client:
+                    client.close()

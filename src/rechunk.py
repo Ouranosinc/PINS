@@ -1,8 +1,8 @@
-import numpy as np
-import utils as u
+import utils as u 
+def rechunk(ds, cfg, task):
+    return ds.chunk(cfg[task]["chunks"])
 
-def _rechunk(ds, cfg):
-    return ds.chunk(cfg["chunks"])
-
-def rechunk(pcat, id0, cfg, task):
-    u.template_1d_func(pcat, id0, cfg, task, _rechunk)
+def main(pcat, cfg, task, wildcards): 
+    dd, cfg0 = u.dynamic_io(pcat,cfg, task, wildcards)
+    out = rechunk(dd["input"], cfg0, task)
+    u.save_tmp_update_path(out, pcat, cfg=cfg0, task=task)

@@ -23,38 +23,38 @@
 # ```
 
 # %%
-### INIT
-from xscen import (
-    ProjectCatalog,
-    load_config,
-    CONFIG,
-    measure_time, send_mail, send_mail_on_exit, timeout, TimeoutException,
-    clean_up
-)
-import utils as u 
-from src import rechunk, regrid, decay, train, adjust, extract,  individual_indicator, indicators, climatology, ensemble
+from xscen import ProjectCatalog, load_config,CONFIG
 import importlib 
+from pathlib import Path
+import os 
+from copy import deepcopy
+from itertools import product
 
-MODULES = [u, extract, rechunk, regrid, decay, train, adjust, individual_indicator, indicators, climatology, ensemble]
-# reload, used for convienience in jupyter mode, so I want to ignore it in 'script' mode
-# Not really a problem if we forget to specify that we are in a script and not in a notebook
+src_mods = ["extract", "rechunk", "regrid", "train", "adjust", "individual_indicator", "indicators", "climatology", "ensemble"]
+r_mods = [("src." + m,m) for m in src_mods] + [("utils","u")]
 cfgfiles = ['config/paths.yml', "config/config.yml", "config/schemas.yml"]
+
+# load
+modules = {short_key:importlib.import_module(mod_name) for mod_name,short_key in r_mods}
+globals().update(modules)
 load_config(*cfgfiles, verbose=(__name__ == '__main__'), reset=True)
-def reload(modules=MODULES, skip=(CONFIG["workflow"]["jupy"]==False)): 
-    if skip: 
-        return 
-    global PATHS, cfg
-    modules = modules if isinstance(modules, list) else [modules]
-    [importlib.reload(m) for m in modules]
+
+def reload(mods=modules): 
+    global CONFIG,cfg
+    for mod in mods.values():
+        importlib.reload(mod)
     load_config(*cfgfiles, verbose=(__name__ == '__main__'), reset=True)
-reload(skip=False)
-# Get project catalog
-if "initialize_pcat" in CONFIG["tasks"]:
-    pcat = ProjectCatalog.create(PATHS['project_catalog'], project=CONFIG['project'], overwrite=True)
-pcat = ProjectCatalog(PATHS['project_catalog'])
-# get sim_ids, if they exist (only works if extraction
-s_ids  = list(pcat.search(processing_level="extracted", type="simulation").df.id)
-id0 = None if len(s_ids)==0 else s_ids[0]  # interactive debugging
+    cfg = deepcopy(CONFIG)
+
+if not os.path.isfile(CONFIG["paths"]['project_catalog'])  or  "initialize_pcat" in CONFIG["tasks"]:
+    pcat = ProjectCatalog.create(CONFIG["paths"]['project_catalog'], project=CONFIG['project'], overwrite=True)
+    for k in CONFIG["paths"].keys(): 
+        if CONFIG["paths"][k] is not None and k.endswith("dir"): 
+            Path(CONFIG["paths"][k]).mkdir(parents=True, exist_ok=True)
+pcat = ProjectCatalog(CONFIG["paths"]['project_catalog'])
+
+sim_ids  = list(pcat.search(processing_level="extracted", type="simulation").df.id)
+xrfreqs = set(pcat.search(processing_level="individual_indicator").df.xrfreq)
 
 
 # %% [markdown]
@@ -63,31 +63,18 @@ id0 = None if len(s_ids)==0 else s_ids[0]  # interactive debugging
 # %%
 if __name__ == '__main__':
 
-# %%
-if instance(slice("1950", "1980")
-
 # %% [markdown]
-# # Extract (ref)
+# # Extract
 
     # %%
-    reload() 
-    if "makeref" in CONFIG["tasks"]: 
-        task = "extract.reference"
-        extract.extract_reference(pcat, CONFIG, task)
-
-    # a quick one and done, should maybe be in makeref
     reload()
-    task = "regrid"
-    ds = pcat.search(processing_level="extracted", type="reconstruction").to_dask()
-    ds = u.fill_empty_facets(ds, ["experiment", "mip_era", "member", "activity", "bias_adjust_project", "version"])
-    rechunk.rechunk(pcat, ds, CONFIG, task)
+    if (task := "extract_reference") in CONFIG["tasks"]: 
+        extract.extract(pcat, id0, CONFIG, task)
 
-
-# %% [markdown]
-# ## Perform extraction (sims)
-
-# %%
-# to be done
+    reload()
+    if (task := "extract_simulation") in CONFIG["tasks"]: 
+        extract.extract(pcat, id0, CONFIG, task)
+        sim_ids =  list(pcat.search(processing_level="extracted", type="simulation").df.id)
 
 
 # %% [markdown]
@@ -96,7 +83,8 @@ if instance(slice("1950", "1980")
     # %%
     reload()
     if (task := "regrid") in CONFIG["tasks"]: 
-        regrid.regrid(pcat, id0, CONFIG, task)
+        for sim_id in sim_ids:
+            regrid.main(pcat,CONFIG,task, wildcards= {"sim_id":sim_id})
 
 # %% [markdown]
 # # Rechunk
@@ -104,8 +92,21 @@ if instance(slice("1950", "1980")
     # %%
     reload()
     if (task := "rechunk") in CONFIG["tasks"]: 
-        rechunk.rechunk(pcat, id0, CONFIG, task)
+        for sim_id in sim_ids:
+            rechunk.main(pcat,CONFIG,task, wildcards={"sim_id":sim_id})
 
+# %% [markdown]
+# # Raw indicators
+
+    # %%
+    reload()
+    if (task := "raw_individual_indicator") in CONFIG["tasks"]: 
+        for sim_id in sim_ids: 
+            individual_indicator.main(pcat, CONFIG, task, wildcards={"sim_id":sim_id})
+    reload()
+    if (task := "raw_indicators") in CONFIG["tasks"]: 
+        for sim_id, xrfreq in product(sim_ids, set(pcat.search(processing_level="raw_individual_indicator").df.xrfreq)):
+            indicators.main(pcat,CONFIG, task, wildcards={"sim_id":sim_id, "xrfreq":xrfreq})
 
 # %% [markdown]
 # # Decay snow
@@ -113,7 +114,8 @@ if instance(slice("1950", "1980")
     # %%
     reload()
     if (task := "decay") in CONFIG["tasks"]: 
-        decay.decay(pcat, id0, CONFIG, task)
+        for sim_id in sim_ids:
+            decay.main(pcat, CONFIG, task, wildcards={"sim_id":sim_id})
 
 # %% [markdown]
 # # Train
@@ -121,16 +123,17 @@ if instance(slice("1950", "1980")
     # %%
     reload()
     if (task := "train") in CONFIG["tasks"]:  
-        dsref = pcat.search(**CONFIG[task]["input_ref"]).to_dask()
-        train.train(pcat, id0, CONFIG, task, dsref)
+        for sim_id,var in product(sim_ids, CONFIG[task]["variables"]):
+            train.main(pcat, CONFIG, task,  wildcards={"sim_id":sim_id, "var":var})
 
 # %% [markdown]
 # # Adjust
 
     # %%
     reload()
-    if (task := "adjust") in CONFIG["tasks"]: 
-        adjust.adjust(pcat, id0, CONFIG, task)
+    if (task := "adjust") in CONFIG["tasks"]:  
+        for sim_id,var in product(sim_ids, CONFIG[task]["variables"]):
+            adjust.main(pcat, CONFIG, task,  wildcards={"sim_id":sim_id, "var":var})
 
 # %% [markdown]
 # # Individual indicator
@@ -138,7 +141,10 @@ if instance(slice("1950", "1980")
     # %%
     reload()
     if (task := "individual_indicator") in CONFIG["tasks"]: 
-        individual_indicator.individual_indicator(pcat, id0, CONFIG, task)
+        for sim_id in sim_ids: 
+            individual_indicator.main(pcat, CONFIG, task, wildcards={"sim_id":sim_id})
+        xrfreqs = set(pcat.search(processing_level="individual_indicator").df.xrfreq)
+        
 
 # %% [markdown]
 # # Indicators
@@ -146,7 +152,8 @@ if instance(slice("1950", "1980")
     # %%
     reload()
     if (task := "indicators") in CONFIG["tasks"]: 
-        indicators.indicators(pcat, id0, CONFIG, task)
+        for sim_id, xrfreq in product(sim_ids, xrfreqs):
+            indicators.main(pcat,CONFIG, task, wildcards={"sim_id":sim_id, "xrfreq":xrfreq})
 
 # %% [markdown]
 # # Climatology
@@ -154,7 +161,9 @@ if instance(slice("1950", "1980")
     # %%
     reload()
     if (task := "climatology") in CONFIG["tasks"]: 
-        climatology.climatology(pcat, id0, CONFIG, task)
+        for sim_id, xrfreq in product(sim_ids, xrfreqs):
+            climatology.main(pcat,CONFIG, task, wildcards={"sim_id":sim_id, "xrfreq":xrfreq})
+
 
 # %% [markdown]
 # # Ensemble
@@ -162,4 +171,5 @@ if instance(slice("1950", "1980")
     # %%
     reload()
     if (task := "ensemble") in CONFIG["tasks"]: 
-        ensemble.ensemble(pcat, id0, CONFIG, task)
+        for xrfreq,experiment in product(xrfreqs,["rcp45"]): 
+            ensemble.main(pcat, CONFIG, task, wildcards={"experiment":experiment, "xrfreq":xrfreq, "experiment":experiment})

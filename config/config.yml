@@ -14,24 +14,23 @@ tasks:
 ####- initialize_pcat # only activate this task the first time you run the workflow to create the ProjectCatalog
 - makeref
 # - initialize_pcat
-- extract
+- extract_reference
+- extract_simulation
 - regrid
 - rechunk
+- raw_individual_indicator
+- raw_indicators
 - decay
 - train
 - adjust
-# - clean_up
-# - final_zarr
 - diagnostics
-# - concat
-# - official-diag
 - individual_indicator
-- extra_indicator
 - indicators
 - climatology
-# - abs-delta
-# - per-delta
 - ensemble
+
+selected_ids: 
+  - "CMIP5_" # the analysis should be done elsewhere.
 
 dask:
   client:
@@ -45,26 +44,16 @@ dask:
     memory_limit: "7GB"
     local_directory: *dask_dir
 
+save_kwargs: &savekws
+  # overwrite: False
+  schemas: ${schemas.schema}
+  save_dir: ${paths.exec_wdir}
+  tmp_dir: ${paths.exec_wdir}
+  overwrite: True
+  simple_saving: False
+  # small dataset for now, so let's keep everything on fast disk
 
-# logging:
-#   formatters:
-#     default:
-#       format: '%(asctime)s %(levelname)-8s %(name)-15s %(message)s'
-#       datefmt: '%Y-%m-%d %H:%M:%S'
-#   handlers:
-#     console:
-#       class: logging.StreamHandler
-#       formatter: default
-#       level: INFO
-    # file:
-    #   class: logging.FileHandler
-    #   formatter: default
-    #   level: DEBUG
-      # filename: ${paths.logging}
-  # loggers:
-  #   xscen:
-  #     level: INFO
-  #     handlers: [ file ]
+
 
 
 custom:
@@ -77,109 +66,75 @@ custom:
     tile_buffer: 1.5
     lon_bnds: [-75, -73.5]
     lat_bnds: [48.5, 50]
-  stack_drop_nans:
-    # goal is to drop Nan to make it faster
-    &stack False
-  chunks:
-    lat: 20 #espo-r
-    lon: 20 #espo-r
-    loc: 600 #espo-r
-    time: -1
-  out_chunks:
-    lat: 50
-    lon: 50
-    time: 4year
   ref_period: &ref_period
     - '1991'
     - '2020'
   sim_period: &sim_period
     - '1950'
     - '2100'
-  maximal_calendar: noleap
-  rechunk:
-    lat: 50
-    lon: 50
 
-common_search: &common_search
-  variables_and_freqs:
-    snw: D
-  allow_conversion: True
-
-current_region: ${custom.test_QC_region}
-
-extract:
-  reference:
-    search_data_catalogs:
-      <<: *common_search
-      periods: *ref_period
-      other_search_criteria:
-        source: &ref_source "ERA5-Land"
-      data_catalogs: ${paths.catalogs}/reconstruction.json
-      allow_resampling: False
-
-    extract_dataset:
-      region: ${current_region}
-
-    chunks: ${custom.chunks}
-    properties_and_measures:
-      to_level_prop: diag-ref-prop
-      period: *ref_period
-      unstack: *stack
-    output:
-      processing_level: extracted
-      type: reconstruction
-  simulation:
-    search_data_catalogs:
-      <<: *common_search
-      data_catalogs: ${paths.catalogs}/simulation.json
-      match_hist_and_fut: True
-      allow_resampling: True
-      restrict_members:
-        ordered: 1
-      periods: *sim_period
-      other_search_criteria:
-        experiment:
-          - ssp245
-          - ssp370
-          - ssp585
-        bias_adjust_institution: OURANOS
-    extract_dataset:
-      periods: *sim_period
-      xr_combine_kwargs:
-        combine_attrs: override
-      xr_open_kwargs:
-        drop_variables:
-        - height
-        chunks:
-          #TODO: test this
-          lat: 100
-          lon: 100
-          time: 365
-        #chunks: {'time': 1, 'lon': -1, 'lat': -1} # only for CNRM-ESM2-1
-    chunks: { 'time': 365, 'lat': -1, 'lon': -1 }
-  ref_source: *ref_source
+extract_kws: 
   dask_kwargs:
     n_workers: 5
     threads_per_worker: 3
     memory_limit: "7GB"
     local_directory: *dask_dir
-  chunks: ${custom.chunks}
+  current_region: ${custom.test_QC_region}
 
 
-rechunk:
-  dask_kwargs:
-    n_workers: 2
-    threads_per_worker: 4
-    memory_limit: 12GB
-    local_directory: *dask_dir
-  input:
-    processing_level: regridded
-  output:
-    processing_level: rechunked
-  chunks:
-    time: -1
-    lon: 30
-    lat: 30
+extract_reference:
+  search_data_catalogs:
+    variables_and_freqs:
+      snw: D
+    periods: *ref_period
+    other_search_criteria:
+      source: &ref_source "ERA5-Land"
+    data_catalogs: ${paths.catalogs}/reconstruction.json
+    allow_conversion: True
+    allow_resampling: False
+  extract_dataset:
+    periods: *ref_period
+    region: ${extract_kws.current_region}
+    xr_combine_kwargs:
+      combine_attrs: override
+    xr_open_kwargs:
+      drop_variables:
+      - height
+      chunks:
+        lat: -1
+        lon: -1
+        time: 365
+  dask_kwargs: ${extract_kws.dask_kwargs}
+
+extract_simulation:
+  search_data_catalogs:
+    variables_and_freqs:
+      snw: D
+    data_catalogs: ${paths.catalogs}/simulation.json
+    match_hist_and_fut: True
+    allow_conversion: True
+    allow_resampling: True
+    restrict_members:
+      ordered: 1
+    periods: *sim_period
+    other_search_criteria:
+      experiment:
+        - ssp245
+        - ssp370
+        - ssp585
+      bias_adjust_institution: OURANOS
+  extract_dataset:
+    periods: *sim_period
+    xr_combine_kwargs:
+      combine_attrs: override
+    xr_open_kwargs:
+      drop_variables:
+      - height
+      chunks:
+        rlat: -1
+        rlon: -1
+        time: 365
+  dask_kwargs: ${extract_kws.dask_kwargs}
 
 regrid:
   dask_kwargs:
@@ -187,22 +142,79 @@ regrid:
     threads_per_worker: 4
     memory_limit: "4GB"
     local_directory: *dask_dir
-  input_ref:
-    source: *ref_source
-    processing_level: extracted
-  input:
-    processing_level: extracted
-  output:
-    processing_level: regridded
-    # I think this might have been necessary for facet grids?
-    # this is a mess
-    version: v2.0
-    bias_adjust_project: QMdec
+  io: 
+    input:
+      processing_level: extracted
+    input_ref:
+      source: *ref_source
+      processing_level: extracted
+    output:
+      processing_level: regridded
+      # I think this might have been necessary for facet grids?
+      # this is a mess
+      version: v2.0
+      bias_adjust_project: QMdec
+    wildcards: &wild_id
+      input: 
+        id: sim_id
+      output: 
+        id: sim_id
+  
   regrid_dataset:
     regridder_kwargs:
       method: bilinear
       skipna: True
     weights_location: ${paths.weightsdir}
+
+rechunk:
+  dask_kwargs:
+    n_workers: 2
+    threads_per_worker: 4
+    memory_limit: 12GB
+    local_directory: *dask_dir
+  io:
+    input:
+      processing_level: regridded
+    output:
+      processing_level: rechunked
+    wildcards: *wild_id
+  chunks:
+    time: -1
+    lon: 30
+    lat: 30
+
+raw_individual_indicator: 
+  io: 
+    input: 
+      processing_level: rechunked
+    output:
+      processing_level: raw_individual_indicator
+    wildcards: 
+      input: 
+        id: sim_id
+      output: 
+        id: sim_id
+        variable: var
+        xrfreq: xrfreq
+  load_xclim_module:
+    filename: ${paths.indicators}
+    reload: True
+  dask_kwargs: *default_dask_kwargs
+
+raw_indicators: 
+  io: 
+    input: 
+      processing_level: raw_individual_indicator
+    output:
+      processing_level: raw_indicators
+    wildcards: 
+      input: 
+        id: sim_id
+        xrfreq: xrfreq
+      output: 
+        id: sim_id
+        xrfreq: xrfreq
+  dask_kwargs: *default_dask_kwargs
 
 io:
   rechunk:
@@ -214,12 +226,15 @@ decay:
     threads_per_worker: 3
     memory_limit: "7GB"
     local_directory: *dask_dir
-  input:
-    processing_level: "rechunked"
-    type: "simulation"
-  output:
-    processing_level: "decayed"
-    type: "simulation"
+  io:
+    input:
+      processing_level: "rechunked"
+      type: "simulation"
+    output:
+      processing_level: "decayed"
+      type: "simulation"
+    wildcards: *wild_id
+
   decay_snow_season_end:
     decay_factor: 0.5
     thresh_decay: "1e-3 kg m-2"
@@ -262,166 +277,126 @@ biasadjust:
         bias_adjust_project: &b_a_pro PINS
 
 train:
-  input_ref:
-    processing_level: "rechunked"
-    type: "reconstruction"
-  input: ${decay.output}
-  output:
-    processing_level: "trained"
+  io:
+    input: 
+      processing_level: decayed
+    input_ref:
+      processing_level: rechunked
+      type: reconstruction
+    output:
+      processing_level: trained
+    wildcards:
+      input: 
+        id: sim_id
+      output: 
+        id: sim_id
+        bias_adjust_project: var
   variables: ${biasadjust.variables}
   dask_kwargs: ${biasadjust.dask_kwargs}
 
 adjust:
-  input: ${train.input}
-  input_ref: ${train.output}
-  output:
-    processing_level: "biasadjusted"
+  io: 
+    input: 
+      processing_level: decayed
+    input_ref: 
+      processing_level: trained
+    output:
+      processing_level: biasadjusted
+    wildcards: 
+      input: 
+        id: sim_id
+      input_ref: 
+        id: sim_id
+        bias_adjust_project: var
+      output: 
+        id: sim_id
+        bias_adjust_project: var
   variables: ${biasadjust.variables}
   dask_kwargs: ${biasadjust.dask_kwargs}
 
-# clean_up:
-#   search_data_catalogs:
-#     variables_and_freqs:
-#       tasmax: D
-#       tasmin: D
-#       pr: D
-#     allow_conversion: True
-#     allow_resampling: False
-#   problems:
-#   - CMIP6_ScenarioMIP_BCC_BCC-CSM2-MR_ssp245_r1i1p1f1_global
-#   - CMIP6_ScenarioMIP_BCC_BCC-CSM2-MR_ssp370_r1i1p1f1_global
-#   - CMIP6_ScenarioMIP_NOAA-GFDL_GFDL-ESM4_ssp245_r1i1p1f1_global
-#   - CMIP6_ScenarioMIP_NOAA-GFDL_GFDL-ESM4_ssp370_r1i1p1f1_global
-#   xscen_clean_up:
-#     maybe_unstack_dict:
-#       stack_drop_nans: *stack
-#       rechunk:
-#         lat: 20 #espo-r
-#         lon: 20 #espo-r
-#         time: -1
-#     round_var:
-#       pr: 10
-#     to_level: cleaned_up
-#     add_attrs:
-#       global:
-#         Notes: |
-#           Regridded on the grid of ERA5-Land, then bias-adjusted with detrended
-#           quantile mapping on a day-of-year basis with a window of 31 days, LOESS
-#           detrending and 50 quantiles. The reference was ERA5-Land over the
-#           1991-2020 period. Tasmax, dtr and pr were adjusted, tasmin was computed
-#           from tasmax and dtr after the adjustment.
-#         redistribution: Redistribution prohibited. For internal use only.
-#         version: "1.0.0"
-#       tasmax:
-#         standard_name: air_temperature
-#         long_name: Maximal daily temperature
-#         cell_methods: "time: maximum within days"
-#       tasmin:
-#         standard_name: air_temperature
-#         long_name: Minimal daily temperature
-#         cell_methods: "time: minimum within days"
-#       pr:
-#         standard_name: precipitation_flux
-#         long_name: Mean daily precipitation flux
-#         cell_methods: "time: mean within days"
-
-
 individual_indicator:
-  input: ${adjust.output}
-  output:
-    # implicit: xrfreq is important too
-    processing_level: individual_indicator
+  io:
+    input: 
+      processing_level: biasadjusted
+    output:
+      # implicit: xrfreq is important too
+      processing_level: individual_indicator
+    wildcards: 
+      input: 
+        id: sim_id
+      output: 
+        id: sim_id
+        variable: var
+        xrfreq: xrfreq
+  save_kwargs:
+    schemas: ${schemas.schema_xrfreq}
   load_xclim_module:
     filename: ${paths.indicators}
     reload: True
   dask_kwargs: *default_dask_kwargs
 
 indicators:
-  input: ${individual_indicator.output}
-  output:
-    # implicit: xrfreq is important too
-    processing_level: indicators
+  io: 
+    input: 
+      processing_level: individual_indicator
+    output:
+      processing_level: indicators
+    wildcards: 
+      input: 
+        id: sim_id
+        xrfreq: xrfreq
+      output: 
+        id: sim_id
+        xrfreq: xrfreq
+  save_kwargs:
+    schemas: ${schemas.schema_xrfreq_no_var}
+    simple_saving: True
   dask_kwargs: *default_dask_kwargs
 
-indicator:
-  source2:
-    processing_level: "individual_indicator"
-  individual_indicator:
-    processing_level: individual_indicator
-  combine_indicator:
-    processing_level: indicators
-
 climatology:
-  input: ${indicators.output}
+  io: 
+    input: 
+      processing_level: indicators
+    output:
+      processing_level: climatology
+    wildcards: 
+      input: 
+        id: sim_id
+        xrfreq: xrfreq
+      output: 
+        id: sim_id
+        xrfreq: xrfreq
+  save_kwargs:
+    schemas: ${schemas.schema_xrfreq}
+    simple_saving: True
   dask_kwargs: *default_dask_kwargs
   climatological_op:
     window: 30
     stride: 10
-  output:
-    processing_level: climatology
   chunks:
     time: -1
     lon: 30
     lat: 30
 
 ensemble:
-  input: ${climatology.output}
-  dask_kwargs: *default_dask_kwargs
-  output:
-    processing_level: ensemble-climatology
+  io: 
+    input: 
+      processing_level: climatology
+    output:
+      processing_level: ensemble-climatology
+    wildcards:
+      input: 
+        xrfreq: xrfreq
+      output: 
+        xrfreq: xrfreq
+
   ensemble_stats:
     statistics:
       ensemble_mean_std_max_min: {}
-
-aggregate:
-  source:
-    clim:
-      processing_level: indicators
-  climatological_mean:
-    window: 30
-    interval: 10
-    periods: [ [ '1991', '2100' ] ]
-    to_level: climatology
-  compute_deltas:
-    reference_horizon: "1991-2020"
-
-diagnostics:
-  ref:
-    properties_and_measures:
-      properties: ${paths.properties}
-    input:
-      processing_level: rechunked
-      type: "reconstruction"
-    output:
-      processing_level: diag-ref
-  sim:
-    properties_and_measures:
-      properties: ${paths.properties}
-      period: *ref_period
-      unstack: *stack
-    input:
-      processing_level: rechunked
-      type: "simulation"
-    input_target:
-      processing_level: ${diagnostics.ref.output.processing_level}-prop
-  adj:
-    properties_and_measures:
-      properties: ${paths.properties}
-      period: *ref_period
-      unstack: False
-    input:
-      processing_level: biasadjusted
-    input_target:
-      processing_level: ${diagnostics.ref.output.processing_level}-prop
-
-scripting:
-  measure_time:
-    cpu: True
-  subject: ESPO-G6
-  send_mail_on_exit:
-    msg_ok: Toutes les étapes demandées ont été complétées.
-    msg_err: Une erreur est survenue durant le traitement.
-    on_error_only: True
+  save_kwargs:
+    schemas: ${schemas.schema_xrfreq}
+    simple_saving: True
+  dask_kwargs: *default_dask_kwargs
 
 tdd:
   xarray_open_kwargs:

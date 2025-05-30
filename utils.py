@@ -8,8 +8,10 @@ from pathlib import Path
 import itertools
 from dask.distributed import Client
 from contextlib import nullcontext
-
-
+from collections.abc import MutableMapping
+import collections 
+from copy import deepcopy
+import pandas as pd
 # =======================================================================================
 # Template functions: Manages I/O and dask clients
 # =======================================================================================
@@ -18,6 +20,16 @@ from contextlib import nullcontext
 def logger(message):
     print(f"{time.strftime('%H:%M:%S')} -- {message}")
 
+def flatten_dict(d: dict, sep: str= '.') -> MutableMapping:
+    [flat_dict] = pd.json_normalize(d, sep=sep).to_dict(orient='records')
+    return flat_dict
+
+def build_path(dd, cfg0,task):
+    # dd = collections.OrderedDict(sorted(dd.items()))
+    path = "_".join(list(dd.values()))
+    tmpdir = str(cfg0["paths"]["tmp"])
+    path = f"{tmpdir}/{path}.zarr"
+    return path
 
 def check_existence_and_log(pcat, target, overwrite=False):
     if overwrite: 
@@ -25,6 +37,19 @@ def check_existence_and_log(pcat, target, overwrite=False):
         return False
     if (exists := pcat.exists_in_cat(**target)) == False:
         logger( target)
+    else:
+        logger(f"already computed { target} ")
+    return exists
+
+
+def check_existence_and_log0(pcat, cfg, task):
+    overwrite = {**cfg["save_kwargs"],**cfg[task].get("save_kwargs",{})}["overwrite"]
+    target = cfg[task]["io"]["output"]
+    if overwrite: 
+        logger(target)
+        return False
+    if (exists := pcat.exists_in_cat(**target)) == False:
+        logger(target)
     else:
         logger(f"already computed { target} ")
     return exists
@@ -40,8 +65,30 @@ def _add_defaults_save_kwargs(save_kwargs, cfg):
     return {**save_kwargs_defaults, **save_kwargs}
 
 
+def dynamic_cfg(cfg, task, wildcards): 
+    cfg0 = deepcopy(cfg)
+    template_wildcards = flatten_dict(cfg0[task]["io"]["wildcards"])
+    for k,v in template_wildcards.items(): 
+        cfg0.set(f"{task}.io.{k}", wildcards[v])
+    return cfg0
+
+def dynamic_io(pcat, cfg, task, wildcards): 
+    cfg0 = dynamic_cfg(cfg,task,wildcards)
+    if check_existence_and_log0(pcat, cfg0, task):
+        return None,None
+    inpd = {}
+    for k in cfg0[task]["io"].keys():
+        if k.startswith("input"): 
+            if pcat is not None: 
+                inpd[k] = pcat.search(**cfg0[task]["io"][k]).to_dask()
+            else: 
+                path = build_path(cfg0[task]["io"][k], cfg0, task)
+                inpd[k] = xr.open_zarr(path)
+    return inpd, cfg0
+
 def template_func(pcat, id0, cfg, task, func, input_type = "dataset", func_kwargs=None, save_kwargs=None):
-    func_kwargs = func_kwargs or {}
+    print(func_kwargs)
+    func_kwargs = {} if func_kwargs is None  else func_kwargs
     save_kwargs = _add_defaults_save_kwargs(save_kwargs, cfg)
     if isinstance(id0, xr.Dataset):
         if input_type != "dataset":
@@ -51,7 +98,8 @@ def template_func(pcat, id0, cfg, task, func, input_type = "dataset", func_kwarg
         id0 = id0 if isinstance(id0, dict) else {"id": id0}
         if check_existence_and_log(pcat, {**id0, **cfg[task]["output"]}, save_kwargs["overwrite"]):
             return
-        cat = pcat.search(**id0, **cfg[task]["input"])
+        print(cfg[task]["input"])
+        cat = pcat.search(**{**id0, **cfg[task]["input"]})
         if input_type == "dataset": 
             input = cat.to_dask(decode_time_delta=False)
         elif input_type == "dict": 
@@ -66,13 +114,16 @@ def template_func(pcat, id0, cfg, task, func, input_type = "dataset", func_kwarg
             client.close()
 
 def template_1d_func(pcat, id0, cfg, task, func, func_kwargs=None, save_kwargs=None):
-    return template_func(pcat, id0, cfg, task, func, input_type ="dataset", func_kwargs=None, save_kwargs=None)
+    input_type = "dataset"
+    return template_func(pcat, id0, cfg, task, func, input_type, func_kwargs, save_kwargs)
 
 def template_dict_func(pcat, id0, cfg, task, func, func_kwargs=None, save_kwargs=None):
-    return template_func(pcat, id0, cfg, task, func, input_type = "dict", func_kwargs=None, save_kwargs=None)
+    input_type = "dict"
+    return template_func(pcat, id0, cfg, task, func, input_type,  func_kwargs, save_kwargs)
 
 def template_cat_func(pcat, id0, cfg, task, func, func_kwargs=None, save_kwargs=None):
-    return template_func(pcat, id0, cfg, task, func, input_type = "cat", func_kwargs=None, save_kwargs=None)
+    input_type = "cat"
+    return template_func(pcat, id0, cfg, task, func, input_type,  func_kwargs, save_kwargs)
 
 
 def template_2d_func(
@@ -80,12 +131,23 @@ def template_2d_func(
 ):
     func_kwargs = func_kwargs or {}
     save_kwargs = _add_defaults_save_kwargs(save_kwargs, cfg)
-    id0 = id0 if isinstance(id0, dict) else {"id": id0}
-    with Client(**dask_kwargs) if cfg["dask"]["use_dask"] else nullcontext() as client:
-        target = {**id0, **cfg[task]["output"]}
-        if not save_kwargs["overwrite"] and check_existence_and_log(pcat, target):
-            logger(f"{target} already computed")
+    if isinstance(id0, xr.Dataset):
+        input = id0
+        
+    else: 
+        id0 = id0 if isinstance(id0, dict) else {"id": id0}
+        if check_existence_and_log(pcat, {**id0, **cfg[task]["output"]}, save_kwargs["overwrite"]):
             return
+        print(cfg[task]["input"])
+        cat = pcat.search(**{**id0, **cfg[task]["input"]})
+        if input_type == "dataset": 
+            input = cat.to_dask(decode_time_delta=False)
+        elif input_type == "dict": 
+            input = cat.to_dataset_dict(decode_time_delta=False)
+        elif input_type == "cat": 
+            input = cat
+
+    with Client(**dask_kwargs) if cfg["dask"]["use_dask"] else nullcontext() as client:
         ds = pcat.search(**id0, **cfg[task]["input"]).to_dask()
         if dsref is None:
             dsref = pcat.search(**id0, **cfg[task]["input_ref"]).to_dask()
@@ -316,9 +378,45 @@ def save_move_update(
         )
     shutil.move(init_path, final_path)
     pcat.update_from_ds(ds=ds, path=str(final_path), info_dict=info_dict)
-
-
 def save_tmp_update_path(
+    ds,
+    pcat,
+    cfg = None, 
+    task= None,
+):  
+    ds = fill_cat_attrs(ds, cfg[task]["io"]["output"])
+    save_kwargs = {**cfg["save_kwargs"], **cfg[task].get("save_kwargs",{})}
+    overwrite = save_kwargs["overwrite"]
+    if pcat is not None:
+        filepath = xs.catutils.build_path(ds, schemas=save_kwargs["schemas"])
+    else: 
+        path = build_path(cfg[task]["io"]["output"], cfg, task)
+        print(path)
+        if os.path.exists(path) and overwrite is False:
+            print(f"{path} already exists")
+        else:        
+            rem_zarr(path)
+        ds.to_zarr(path)
+        return 
+    tmp_dir, save_dir = save_kwargs["tmp_dir"], save_kwargs["save_dir"]
+    tmp_dir = tmp_dir or save_dir
+    path = f"{tmp_dir}/{filepath}.tmp.zarr"
+    final_path = path.replace(".tmp.", ".").replace(str(tmp_dir), str(save_dir))
+    if os.path.exists(final_path) and overwrite is False:
+        print(f"{final_path} already exists")
+    else:
+        rem_zarr(path)
+        rem_zarr(final_path)
+        save_move_update(
+            ds=ds,
+            pcat=pcat,
+            init_path=path,
+            final_path=final_path,
+            simple_saving=save_kwargs["simple_saving"],
+        )
+
+
+def save_tmp_update_path0(
     ds,
     schemas,
     pcat,

@@ -4,7 +4,7 @@ import xscen as xs
 import pins_utils as pu
 
 
-def _ensemble(dsd, cfg):
+def ensemble(dsd, cfg,task):
     # some indicators (season_start & season_end) need to be transformed
     # so that taking means make some sense
     for k in dsd.keys():
@@ -16,15 +16,11 @@ def _ensemble(dsd, cfg):
             ):
                 dsd[k][v] = dsd[k][v].astype("datetime64[D]").astype(np.float32)
         dsd[k] = pu.days_since_to_doy(dsd[k])
-    return xs.ensembles.ensemble_stats(datasets=dsd, **cfg["ensemble_stats"])
+    return xs.ensembles.ensemble_stats(datasets=dsd, **cfg[task]["ensemble_stats"])
 
-def ensemble(pcat, id0, cfg, task):
-    for xrfreq in set(pcat.search(**cfg[task]["input"]).df.xrfreq):
-        # at this point, id is not a unique identifier
-        id0f = {"id": id0, "xrfreq": xrfreq}
-        save_kwargs = {
-            "schemas": cfg["schemas"]["schema_xrfreq_no_var"],
-            "simple_saving": True,
-        }
-        # could also be a template_cat_func
-        u.template_dict_func(pcat, id0f, cfg, task, _ensemble, save_kwargs=save_kwargs)
+def main(pcat, cfg, task, wildcards):
+    cfg0 = u.dynamic_cfg(cfg,task,wildcards)
+    dsd = pcat.search(**cfg0[task]["io"]["input"]).to_dataset_dict()
+    out = ensemble(dsd,cfg, task)
+    u.save_tmp_update_path(out, pcat, cfg=cfg0, task=task)
+
