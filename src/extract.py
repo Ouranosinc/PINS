@@ -5,7 +5,7 @@ from contextlib import nullcontext
 from xscen import search_data_catalogs, extract_dataset
 
 def extract(ds, cfg): 
-    out = ds.convert_calendar("365_day")
+    out = ds
     out["time"] = out.time.astype("datetime64[ns]")
     out = out.chunk(cfg["chunks"])
     return out

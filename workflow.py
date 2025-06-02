@@ -78,7 +78,7 @@ if __name__ == '__main__':
         for sim_id in sim_ids:
             regrid.main(pcat,CONFIG,task, wildcards= {"sim_id":sim_id})
 
-# %% [markdown] jp-MarkdownHeadingCollapsed=true
+# %% [markdown]
 # # Rechunk
 
     # %%
@@ -113,14 +113,17 @@ if __name__ == '__main__':
         for sim_id in sim_ids:
             decay.main(pcat, CONFIG, task, wildcards={"sim_id":sim_id})
 
-# %% [markdown] jp-MarkdownHeadingCollapsed=true
+# %% [markdown]
 # # Train
 
     # %%
     reload()
     if (task := "train") in CONFIG["tasks"]:  
         for sim_id,var in product(sim_ids, CONFIG[task]["variables"]):
-            train.main(pcat, CONFIG, task,  wildcards={"sim_id":sim_id, "var":var})
+            # train.main(pcat, CONFIG, task,  wildcards={"sim_id":sim_id, "var":var})
+
+# %%
+sim_ids
 
 # %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Adjust

@@ -15,5 +15,8 @@ def train(ds, dsref, cfg, task, var):
 
 def main(pcat, cfg, task, wildcards):
     dd, cfg0 = u.dynamic_io(pcat,cfg, task, wildcards)
+    sim_cal, ref_cal = [dd[k].time.dt.calendar for k in ["input", "input_ref"]]
+    if ref_cal != sim_cal: 
+        dd["input_ref"] = dd["input_ref"].convert_calendar(sim_cal)
     out = train(dd["input"],dd["input_ref"], cfg0, task, var=wildcards["var"])
     u.save_tmp_update_path(out, pcat, cfg=cfg0, task=task) 
