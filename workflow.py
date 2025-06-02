@@ -13,14 +13,7 @@
 # ---
 
 # %% [markdown]
-# # TODO: Find a mask? 
-#
-# We used to apply a mask for lakes I believe. Do we have a similar mask for CMIP6-MRCC5?
-# ```python
-#     file_snc = "/.../bbo/series/200601/snc_bbo_200601_se.nc"
-#     daSnc = xr.open_dataset(file_snc)["snc"].isel(time=0)
-#     mask_snc  = daSnc.sel(rlat = dsOur["snw"].rlat, rlon = dsOur["snw"].rlon)
-# ```
+# # Init
 
 # %%
 from xscen import ProjectCatalog, load_config,CONFIG
@@ -31,7 +24,7 @@ from copy import deepcopy
 from itertools import product
 
 src_mods = ["extract", "rechunk", "regrid", "train", "adjust", "individual_indicator", "indicators", "climatology", "ensemble"]
-r_mods = [("src." + m,m) for m in src_mods] + [("utils","u")]
+r_mods = [("src." + m,m) for m in src_mods] + [("utils","u"), ("pins_utils","pu")]
 cfgfiles = ['config/paths.yml', "config/config.yml", "config/schemas.yml"]
 
 # load
@@ -63,21 +56,20 @@ xrfreqs = set(pcat.search(processing_level="individual_indicator").df.xrfreq)
 # %%
 if __name__ == '__main__':
 
-# %% [markdown]
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Extract
 
     # %%
     reload()
     if (task := "extract_reference") in CONFIG["tasks"]: 
-        extract.extract(pcat, id0, CONFIG, task)
+        extract.main(pcat, CONFIG, task)
 
-    reload()
     if (task := "extract_simulation") in CONFIG["tasks"]: 
-        extract.extract(pcat, id0, CONFIG, task)
+        extract.main(pcat, CONFIG, task)
         sim_ids =  list(pcat.search(processing_level="extracted", type="simulation").df.id)
 
 
-# %% [markdown]
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Regrid
 
     # %%
@@ -86,7 +78,7 @@ if __name__ == '__main__':
         for sim_id in sim_ids:
             regrid.main(pcat,CONFIG,task, wildcards= {"sim_id":sim_id})
 
-# %% [markdown]
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Rechunk
 
     # %%
@@ -95,20 +87,24 @@ if __name__ == '__main__':
         for sim_id in sim_ids:
             rechunk.main(pcat,CONFIG,task, wildcards={"sim_id":sim_id})
 
-# %% [markdown]
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Raw indicators
 
+# %%
+# u._delete_kws_(pcat, {"processing_level":["raw_individual_indicator", "raw_indicators"]})
+
     # %%
+    # Maybe just restrict to SSS and SSE, currently all raw indicators are computed
     reload()
     if (task := "raw_individual_indicator") in CONFIG["tasks"]: 
-        for sim_id in sim_ids: 
+        for sim_id in sim_ids+["ECMWF_ERA5-Land_NAM"]: 
             individual_indicator.main(pcat, CONFIG, task, wildcards={"sim_id":sim_id})
-    reload()
     if (task := "raw_indicators") in CONFIG["tasks"]: 
-        for sim_id, xrfreq in product(sim_ids, set(pcat.search(processing_level="raw_individual_indicator").df.xrfreq)):
+        xrfreqs0 = set(pcat.search(processing_level="raw_individual_indicator").df.xrfreq)
+        for sim_id, xrfreq in product(sim_ids+["ECMWF_ERA5-Land_NAM"], xrfreqs0):
             indicators.main(pcat,CONFIG, task, wildcards={"sim_id":sim_id, "xrfreq":xrfreq})
 
-# %% [markdown]
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Decay snow
 
     # %%
@@ -117,7 +113,7 @@ if __name__ == '__main__':
         for sim_id in sim_ids:
             decay.main(pcat, CONFIG, task, wildcards={"sim_id":sim_id})
 
-# %% [markdown]
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Train
 
     # %%
@@ -126,7 +122,7 @@ if __name__ == '__main__':
         for sim_id,var in product(sim_ids, CONFIG[task]["variables"]):
             train.main(pcat, CONFIG, task,  wildcards={"sim_id":sim_id, "var":var})
 
-# %% [markdown]
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Adjust
 
     # %%
@@ -135,7 +131,7 @@ if __name__ == '__main__':
         for sim_id,var in product(sim_ids, CONFIG[task]["variables"]):
             adjust.main(pcat, CONFIG, task,  wildcards={"sim_id":sim_id, "var":var})
 
-# %% [markdown]
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Individual indicator
 
     # %%
@@ -144,9 +140,9 @@ if __name__ == '__main__':
         for sim_id in sim_ids: 
             individual_indicator.main(pcat, CONFIG, task, wildcards={"sim_id":sim_id})
         xrfreqs = set(pcat.search(processing_level="individual_indicator").df.xrfreq)
-        
 
-# %% [markdown]
+
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Indicators
 
     # %%
@@ -155,7 +151,7 @@ if __name__ == '__main__':
         for sim_id, xrfreq in product(sim_ids, xrfreqs):
             indicators.main(pcat,CONFIG, task, wildcards={"sim_id":sim_id, "xrfreq":xrfreq})
 
-# %% [markdown]
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Climatology
 
     # %%
@@ -165,7 +161,7 @@ if __name__ == '__main__':
             climatology.main(pcat,CONFIG, task, wildcards={"sim_id":sim_id, "xrfreq":xrfreq})
 
 
-# %% [markdown]
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Ensemble
 
     # %%

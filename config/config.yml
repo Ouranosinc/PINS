@@ -9,6 +9,10 @@ workflow:
   overwrite: True
   # overwrite: False
 
+cat_attrs: 
+  version: ${project.version}
+  bias_adjust_project: ${project.id}
+
 
 tasks:
 ####- initialize_pcat # only activate this task the first time you run the workflow to create the ProjectCatalog
@@ -60,12 +64,19 @@ custom:
   overwrite: False
   delete_in_final_zarr: False
   delete_in_diag: True
-  test_QC_region:
-    name: test_QC
-    method: bbox
-    tile_buffer: 1.5
-    lon_bnds: [-75, -73.5]
-    lat_bnds: [48.5, 50]
+  regions:
+    test_QC_region:
+      name: test_QC
+      method: bbox
+      tile_buffer: 1.5
+      lon_bnds: [-75, -73.5]
+      lat_bnds: [48.5, 50]
+    # QC:
+    #   name: QC
+    #   method: bbox
+    #   tile_buffer: 1.5
+    #   lon_bnds: [-79.765247, -56.934953]
+    #   lat_bnds: [44.991361, 62.582585]
   ref_period: &ref_period
     - '1991'
     - '2020'
@@ -79,7 +90,7 @@ extract_kws:
     threads_per_worker: 3
     memory_limit: "7GB"
     local_directory: *dask_dir
-  current_region: ${custom.test_QC_region}
+  current_region: ${custom.regions.test_QC_region}
 
 
 extract_reference:
@@ -94,7 +105,6 @@ extract_reference:
     allow_resampling: False
   extract_dataset:
     periods: *ref_period
-    region: ${extract_kws.current_region}
     xr_combine_kwargs:
       combine_attrs: override
     xr_open_kwargs:
@@ -104,9 +114,20 @@ extract_reference:
         lat: -1
         lon: -1
         time: 365
+  io: 
+    output: 
+      processing_level: extracted
+  chunks:
+    lat: -1
+    lon: -1
+    time: 365    
   dask_kwargs: ${extract_kws.dask_kwargs}
 
 extract_simulation:
+  chunks:
+    rlat: -1
+    rlon: -1
+    time: 365
   search_data_catalogs:
     variables_and_freqs:
       snw: D
@@ -119,10 +140,17 @@ extract_simulation:
     periods: *sim_period
     other_search_criteria:
       experiment:
-        - ssp245
-        - ssp370
+        # - ssp245
+        # - ssp370
         - ssp585
-      bias_adjust_institution: OURANOS
+      # source: 
+      #   - CCCma-CanESM5
+      #   - MIROC6
+  io: 
+    output: 
+      processing_level: extracted
+    
+      # bias_adjust_institution: OURANOS
   extract_dataset:
     periods: *sim_period
     xr_combine_kwargs:
@@ -199,6 +227,8 @@ raw_individual_indicator:
   load_xclim_module:
     filename: ${paths.indicators}
     reload: True
+  save_kwargs: 
+    schemas: ${schemas.schema_xrfreq}
   dask_kwargs: *default_dask_kwargs
 
 raw_indicators: 
@@ -214,6 +244,9 @@ raw_indicators:
       output: 
         id: sim_id
         xrfreq: xrfreq
+  save_kwargs: 
+    schemas: ${schemas.schema_xrfreq_no_var}
+    simple_saving: True 
   dask_kwargs: *default_dask_kwargs
 
 io:

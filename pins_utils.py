@@ -90,7 +90,8 @@ def decay_snow_season_end(
     # Is this step only useful for the snow season branch? I have a doubt
     out = xr.where(mask, decayed_da, snw)
     out = out.where(out > thresh_decay, 0).assign_attrs(attrs).astype(np.float32)
-    return out.where(snw)
+    return out
+
 
 
 def _get_date(xrfreq):

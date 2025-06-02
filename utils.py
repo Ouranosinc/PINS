@@ -480,3 +480,21 @@ def get_common_dict(dsl):
             keys.append(k)
     ind0 = list(dsl)[0]
     return {k: v for k, v in ind0.attrs.items()}
+
+def my_to_dataset(pcat, search_kws, coord_keys): 
+    paths = pcat.search(**search_kws).df.path
+    dsl = []
+    coordsl = []
+    for p in paths: 
+        ds = xr.open_zarr(p)
+        # add necessary coords
+        c0s = {c:[ds.attrs[f"cat:{c}"]] for c in coord_keys}
+        ds = ds.expand_dims(c0s)
+        ds["time"] = ds.time.astype("datetime64[ns]")
+        dsl.append(ds)
+        # keep track of coords to ensure they are all unique
+        coordsl.append("_".join([c0s[c][0] for c in coord_keys]))
+    # u.cbc : Combine by coords. I add all necessary coords
+    ds = cbc(dsl)
+    assert len(set(coordsl))==len(paths)
+    return ds
