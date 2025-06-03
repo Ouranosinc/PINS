@@ -12,7 +12,7 @@
 #     name: python3
 # ---
 
-# %% [markdown]
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Init
 
 # %%
@@ -47,11 +47,12 @@ if not os.path.isfile(CONFIG["paths"]['project_catalog'])  or  "initialize_pcat"
 pcat = ProjectCatalog(CONFIG["paths"]['project_catalog'])
 
 sim_ids  = list(pcat.search(processing_level="extracted", type="simulation").df.id)
+# Select only simulations with a seasonality similar to the reference. 
+# This is determined using the raw indicators in analysis.ipynb
+# The major part of the workflow is then only performed on simulations deemed acceptable
+sim_ids0  = CONFIG["selected_ids"]
 xrfreqs = set(pcat.search(processing_level="individual_indicator").df.xrfreq)
 
-
-# %% [markdown]
-# # Main
 
 # %%
 if __name__ == '__main__':
@@ -78,7 +79,7 @@ if __name__ == '__main__':
         for sim_id in sim_ids:
             regrid.main(pcat,CONFIG,task, wildcards= {"sim_id":sim_id})
 
-# %% [markdown]
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Rechunk
 
     # %%
@@ -90,11 +91,10 @@ if __name__ == '__main__':
 # %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Raw indicators
 
-# %%
-# u._delete_kws_(pcat, {"processing_level":["raw_individual_indicator", "raw_indicators"]})
-
     # %%
     # Maybe just restrict to SSS and SSE, currently all raw indicators are computed
+    # Using these raw indicators, it is now possible to see which simulation have very bad seasonality 
+    # and reject them. How it is done is shown in analysis.ipynb
     reload()
     if (task := "raw_individual_indicator") in CONFIG["tasks"]: 
         for sim_id in sim_ids+["ECMWF_ERA5-Land_NAM"]: 
@@ -110,20 +110,17 @@ if __name__ == '__main__':
     # %%
     reload()
     if (task := "decay") in CONFIG["tasks"]: 
-        for sim_id in sim_ids:
+        for sim_id in sim_ids0:
             decay.main(pcat, CONFIG, task, wildcards={"sim_id":sim_id})
 
-# %% [markdown]
+# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Train
 
     # %%
     reload()
     if (task := "train") in CONFIG["tasks"]:  
-        for sim_id,var in product(sim_ids, CONFIG[task]["variables"]):
-            # train.main(pcat, CONFIG, task,  wildcards={"sim_id":sim_id, "var":var})
-
-# %%
-sim_ids
+        for sim_id,var in product(sim_ids0, CONFIG[task]["variables"]):
+            train.main(pcat, CONFIG, task,  wildcards={"sim_id":sim_id, "var":var})
 
 # %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Adjust
@@ -131,7 +128,7 @@ sim_ids
     # %%
     reload()
     if (task := "adjust") in CONFIG["tasks"]:  
-        for sim_id,var in product(sim_ids, CONFIG[task]["variables"]):
+        for sim_id,var in product(sim_ids0, CONFIG[task]["variables"]):
             adjust.main(pcat, CONFIG, task,  wildcards={"sim_id":sim_id, "var":var})
 
 # %% [markdown] jp-MarkdownHeadingCollapsed=true
@@ -140,7 +137,7 @@ sim_ids
     # %%
     reload()
     if (task := "individual_indicator") in CONFIG["tasks"]: 
-        for sim_id in sim_ids: 
+        for sim_id in sim_ids0: 
             individual_indicator.main(pcat, CONFIG, task, wildcards={"sim_id":sim_id})
         xrfreqs = set(pcat.search(processing_level="individual_indicator").df.xrfreq)
 
@@ -151,7 +148,7 @@ sim_ids
     # %%
     reload()
     if (task := "indicators") in CONFIG["tasks"]: 
-        for sim_id, xrfreq in product(sim_ids, xrfreqs):
+        for sim_id, xrfreq in product(sim_ids0, xrfreqs):
             indicators.main(pcat,CONFIG, task, wildcards={"sim_id":sim_id, "xrfreq":xrfreq})
 
 # %% [markdown] jp-MarkdownHeadingCollapsed=true
@@ -160,7 +157,7 @@ sim_ids
     # %%
     reload()
     if (task := "climatology") in CONFIG["tasks"]: 
-        for sim_id, xrfreq in product(sim_ids, xrfreqs):
+        for sim_id, xrfreq in product(sim_ids0, xrfreqs):
             climatology.main(pcat,CONFIG, task, wildcards={"sim_id":sim_id, "xrfreq":xrfreq})
 
 

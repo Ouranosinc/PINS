@@ -33,8 +33,18 @@ tasks:
 - climatology
 - ensemble
 
+
 selected_ids: 
-  - "CMIP5_" # the analysis should be done elsewhere.
+ - 'CMIP5_CORDEX_MPI-M-MPI-ESM-LR_UQAM_UQAM-CRCM5_rcp45_r1i1p1_NAM-44',
+ - 'CMIP5_MRCC5_CNRM-CM5_OURANOS_CRCM5_rcp45_r1i1p1_NAM-22',
+ - 'CMIP5_MRCC5_GFDL-ESM2M_OURANOS_CRCM5_rcp45_r1i1p1_NAM-22',
+ - 'CMIP5_MRCC5_MPI-ESM-LR_OURANOS_CRCM5_rcp45_r1i1p1_NAM-22',
+ - 'CMIP5_MRCC5_CNRM-CM5_OURANOS_CRCM5_rcp85_r1i1p1_NAM-22',
+ - 'CMIP5_MRCC5_GFDL-ESM2M_OURANOS_CRCM5_rcp85_r1i1p1_NAM-22',
+ - 'CMIP5_CORDEX_MOHC-HadGEM2-ES_ISU_ISU-RegCM4_rcp85_r1i1p1_NAM-22',
+ - 'CMIP5_CORDEX_MPI-M-MPI-ESM-LR_NCAR_NCAR-RegCM4_rcp85_r1i1p1_NAM-22',
+ - 'CMIP5_MRCC5_MPI-ESM-LR_OURANOS_CRCM5_rcp85_r1i1p1_NAM-22',
+ - 'CMIP5_CORDEX_NOAA-GFDL-GFDL-ESM2M_NCAR_WRF_rcp85_r1i1p1_NAM-22'
 
 dask:
   client:
@@ -48,35 +58,32 @@ dask:
     memory_limit: "7GB"
     local_directory: *dask_dir
 
+# All these kws can be changed in each processing-level
 save_kwargs: &savekws
-  # overwrite: False
+  overwrite: True
   schemas: ${schemas.schema}
   save_dir: ${paths.exec_wdir}
   tmp_dir: ${paths.exec_wdir}
   overwrite: True
   simple_saving: False
-  # small dataset for now, so let's keep everything on fast disk
-
-
-
 
 custom:
   overwrite: False
   delete_in_final_zarr: False
   delete_in_diag: True
   regions:
-    test_QC_region:
-      name: test_QC
+    QC:
+      name: QC
       method: bbox
       tile_buffer: 1.5
-      lon_bnds: [-75, -73.5]
-      lat_bnds: [48.5, 50]
-    # QC:
-    #   name: QC
+      lon_bnds: [-79.765247, -56.934953]
+      lat_bnds: [44.991361, 62.582585]
+    # test_QC_region:
+    #   name: test_QC
     #   method: bbox
     #   tile_buffer: 1.5
-    #   lon_bnds: [-79.765247, -56.934953]
-    #   lat_bnds: [44.991361, 62.582585]
+    #   lon_bnds: [-75, -73.5]
+    #   lat_bnds: [48.5, 50]
   ref_period: &ref_period
     - '1991'
     - '2020'
@@ -84,16 +91,10 @@ custom:
     - '1950'
     - '2100'
 
-extract_kws: 
-  dask_kwargs:
-    n_workers: 5
-    threads_per_worker: 3
-    memory_limit: "7GB"
-    local_directory: *dask_dir
-  current_region: ${custom.regions.test_QC_region}
-
-
 extract_reference:
+  io: 
+    output: 
+      processing_level: extracted
   search_data_catalogs:
     variables_and_freqs:
       snw: D
@@ -114,16 +115,20 @@ extract_reference:
         lat: -1
         lon: -1
         time: 365
-  io: 
-    output: 
-      processing_level: extracted
   chunks:
     lat: -1
     lon: -1
     time: 365    
-  dask_kwargs: ${extract_kws.dask_kwargs}
+  dask_kwargs: &extract_dask
+    n_workers: 5
+    threads_per_worker: 3
+    memory_limit: "7GB"
+    local_directory: *dask_dir
 
 extract_simulation:
+  io: 
+    output: 
+      processing_level: extracted
   chunks:
     rlat: -1
     rlon: -1
@@ -140,17 +145,9 @@ extract_simulation:
     periods: *sim_period
     other_search_criteria:
       experiment:
-        # - ssp245
-        # - ssp370
+        - ssp245
+        - ssp370
         - ssp585
-      # source: 
-      #   - CCCma-CanESM5
-      #   - MIROC6
-  io: 
-    output: 
-      processing_level: extracted
-    
-      # bias_adjust_institution: OURANOS
   extract_dataset:
     periods: *sim_period
     xr_combine_kwargs:
@@ -162,7 +159,7 @@ extract_simulation:
         rlat: -1
         rlon: -1
         time: 365
-  dask_kwargs: ${extract_kws.dask_kwargs}
+  dask_kwargs: *extract_dask
 
 regrid:
   dask_kwargs:
@@ -178,8 +175,6 @@ regrid:
       processing_level: extracted
     output:
       processing_level: regridded
-      # I think this might have been necessary for facet grids?
-      # this is a mess
       version: v2.0
       bias_adjust_project: QMdec
     wildcards: &wild_id
@@ -187,7 +182,6 @@ regrid:
         id: sim_id
       output: 
         id: sim_id
-  
   regrid_dataset:
     regridder_kwargs:
       method: bilinear
@@ -195,11 +189,6 @@ regrid:
     weights_location: ${paths.weightsdir}
 
 rechunk:
-  dask_kwargs:
-    n_workers: 2
-    threads_per_worker: 4
-    memory_limit: 12GB
-    local_directory: *dask_dir
   io:
     input:
       processing_level: regridded
@@ -210,6 +199,11 @@ rechunk:
     time: -1
     lon: 30
     lat: 30
+  dask_kwargs:
+    n_workers: 2
+    threads_per_worker: 4
+    memory_limit: 12GB
+    local_directory: *dask_dir
 
 raw_individual_indicator: 
   io: 
@@ -249,10 +243,6 @@ raw_indicators:
     simple_saving: True 
   dask_kwargs: *default_dask_kwargs
 
-io:
-  rechunk:
-    worker_mem: 2GB
-
 decay:
   dask_kwargs:
     n_workers: 5
@@ -276,11 +266,6 @@ decay:
 
 # meta-config for train and adjust
 biasadjust:
-  dask_kwargs:
-    n_workers: 5
-    threads_per_worker: 3
-    memory_limit: "7GB"
-    local_directory: *dask_dir
   variables:
     snw:
       training_args:
@@ -293,8 +278,6 @@ biasadjust:
         jitter_under:
           thresh: 1e-8 kg m-2
         xsdba_train_args:
-          # in the future change this for xsdba_train_args, I can't update xscen
-          # special section, PINS had custom quantiles
           nquantiles:
             start: 0.05
             stop: 1
@@ -308,6 +291,11 @@ biasadjust:
           extrapolation: constant
         bias_adjust_institution: &b_a_inst Ouranos
         bias_adjust_project: &b_a_pro PINS
+  dask_kwargs:
+    n_workers: 5
+    threads_per_worker: 3
+    memory_limit: "7GB"
+    local_directory: *dask_dir
 
 train:
   io:
@@ -352,7 +340,6 @@ individual_indicator:
     input: 
       processing_level: biasadjusted
     output:
-      # implicit: xrfreq is important too
       processing_level: individual_indicator
     wildcards: 
       input: 
@@ -422,7 +409,6 @@ ensemble:
         xrfreq: xrfreq
       output: 
         xrfreq: xrfreq
-
   ensemble_stats:
     statistics:
       ensemble_mean_std_max_min: {}
@@ -430,7 +416,3 @@ ensemble:
     schemas: ${schemas.schema_xrfreq}
     simple_saving: True
   dask_kwargs: *default_dask_kwargs
-
-tdd:
-  xarray_open_kwargs:
-    decode_timedelta: False

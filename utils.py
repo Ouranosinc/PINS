@@ -12,11 +12,11 @@ from collections.abc import MutableMapping
 import collections 
 from copy import deepcopy
 import pandas as pd
+
 # =======================================================================================
 # Template functions: Manages I/O and dask clients
 # =======================================================================================
 
-# good ol' logger
 def logger(message):
     print(f"{time.strftime('%H:%M:%S')} -- {message}")
 
@@ -25,24 +25,12 @@ def flatten_dict(d: dict, sep: str= '.') -> MutableMapping:
     return flat_dict
 
 def build_path(dd, cfg0,task):
-    # dd = collections.OrderedDict(sorted(dd.items()))
     path = "_".join(list(dd.values()))
     tmpdir = str(cfg0["paths"]["tmp"])
     path = f"{tmpdir}/{path}.zarr"
     return path
 
-def check_existence_and_log(pcat, target, overwrite=False):
-    if overwrite: 
-        logger(target)
-        return False
-    if (exists := pcat.exists_in_cat(**target)) == False:
-        logger( target)
-    else:
-        logger(f"already computed { target} ")
-    return exists
-
-
-def check_existence_and_log0(pcat, cfg, task):
+def check_existence_and_log(pcat, cfg, task):
     overwrite = {**cfg["save_kwargs"],**cfg[task].get("save_kwargs",{})}["overwrite"]
     target = cfg[task]["io"]["output"]
     if overwrite: 
@@ -54,17 +42,6 @@ def check_existence_and_log0(pcat, cfg, task):
         logger(f"already computed { target} ")
     return exists
 
-def _add_defaults_save_kwargs(save_kwargs, cfg):
-    save_kwargs = save_kwargs or {}
-    save_kwargs_defaults = {
-        "schemas": cfg["schemas"]["schema"],
-        "save_dir": cfg["paths"]["exec_wdir"],
-        "tmp_dir": None,
-        "overwrite": cfg["workflow"]["overwrite"],
-    }
-    return {**save_kwargs_defaults, **save_kwargs}
-
-
 def dynamic_cfg(cfg, task, wildcards): 
     cfg0 = deepcopy(cfg)
     template_wildcards = flatten_dict(cfg0[task]["io"]["wildcards"])
@@ -74,7 +51,7 @@ def dynamic_cfg(cfg, task, wildcards):
 
 def dynamic_io(pcat, cfg, task, wildcards): 
     cfg0 = dynamic_cfg(cfg,task,wildcards)
-    if check_existence_and_log0(pcat, cfg0, task):
+    if check_existence_and_log(pcat, cfg0, task):
         return None,None
     inpd = {}
     for k in cfg0[task]["io"].keys():
@@ -86,77 +63,6 @@ def dynamic_io(pcat, cfg, task, wildcards):
                 inpd[k] = xr.open_zarr(path)
     return inpd, cfg0
 
-def template_func(pcat, id0, cfg, task, func, input_type = "dataset", func_kwargs=None, save_kwargs=None):
-    print(func_kwargs)
-    func_kwargs = {} if func_kwargs is None  else func_kwargs
-    save_kwargs = _add_defaults_save_kwargs(save_kwargs, cfg)
-    if isinstance(id0, xr.Dataset):
-        if input_type != "dataset":
-            raise ValueError(f"If `id0` is a xr.Dataset, `input_type` should be 'dataset'. Got {input_type}")
-        input = id0
-    else: 
-        id0 = id0 if isinstance(id0, dict) else {"id": id0}
-        if check_existence_and_log(pcat, {**id0, **cfg[task]["output"]}, save_kwargs["overwrite"]):
-            return
-        print(cfg[task]["input"])
-        cat = pcat.search(**{**id0, **cfg[task]["input"]})
-        if input_type == "dataset": 
-            input = cat.to_dask(decode_time_delta=False)
-        elif input_type == "dict": 
-            input = cat.to_dataset_dict(decode_time_delta=False)
-        elif input_type == "cat": 
-            input = cat
-    with Client(**dask_kwargs) if cfg["dask"]["use_dask"] else nullcontext() as client:
-        ds = func(input, cfg[task], **func_kwargs)
-        ds = fill_cat_attrs(ds, cfg[task]["output"])
-        save_tmp_update_path(ds, pcat=pcat, **save_kwargs)
-        if client:
-            client.close()
-
-def template_1d_func(pcat, id0, cfg, task, func, func_kwargs=None, save_kwargs=None):
-    input_type = "dataset"
-    return template_func(pcat, id0, cfg, task, func, input_type, func_kwargs, save_kwargs)
-
-def template_dict_func(pcat, id0, cfg, task, func, func_kwargs=None, save_kwargs=None):
-    input_type = "dict"
-    return template_func(pcat, id0, cfg, task, func, input_type,  func_kwargs, save_kwargs)
-
-def template_cat_func(pcat, id0, cfg, task, func, func_kwargs=None, save_kwargs=None):
-    input_type = "cat"
-    return template_func(pcat, id0, cfg, task, func, input_type,  func_kwargs, save_kwargs)
-
-
-def template_2d_func(
-    pcat, id0, cfg, task, func, dsref=None, func_kwargs=None, save_kwargs=None
-):
-    func_kwargs = func_kwargs or {}
-    save_kwargs = _add_defaults_save_kwargs(save_kwargs, cfg)
-    if isinstance(id0, xr.Dataset):
-        input = id0
-        
-    else: 
-        id0 = id0 if isinstance(id0, dict) else {"id": id0}
-        if check_existence_and_log(pcat, {**id0, **cfg[task]["output"]}, save_kwargs["overwrite"]):
-            return
-        print(cfg[task]["input"])
-        cat = pcat.search(**{**id0, **cfg[task]["input"]})
-        if input_type == "dataset": 
-            input = cat.to_dask(decode_time_delta=False)
-        elif input_type == "dict": 
-            input = cat.to_dataset_dict(decode_time_delta=False)
-        elif input_type == "cat": 
-            input = cat
-
-    with Client(**dask_kwargs) if cfg["dask"]["use_dask"] else nullcontext() as client:
-        ds = pcat.search(**id0, **cfg[task]["input"]).to_dask()
-        if dsref is None:
-            dsref = pcat.search(**id0, **cfg[task]["input_ref"]).to_dask()
-        ds = func(ds, dsref, cfg[task], **func_kwargs)
-        ds = fill_cat_attrs(ds, cfg[task]["output"])
-        save_tmp_update_path(ds, pcat=pcat, **save_kwargs)
-        if client:
-            client.close()
-
 # =======================================================================================
 # pcat, gen utls
 # =======================================================================================
@@ -166,124 +72,31 @@ def fill_empty_facets(ds, facets):
         ds.attrs[f"cat:{f}"] = v
     return ds
 
-
 def fill_cat_attrs(ds, dd):
     for k, a in dd.items():
         ds.attrs[f"cat:{k}"] = a
     return ds
-
 
 def nget(d, key):
     if len(keyl := key.split(".")) > 1:
         return nget(d.get(keyl[0]), ".".join(keyl[1:]))
     return d[keyl[0]]
 
-
 def _delete_last_pcat_entry_(pcat):
     """with great powers comes great responsibility"""
     p = list(pcat.df.path)[-1]
-    rem_zarr(p)
+    rmrf(p)
     pcat.update()
-
 
 def _delete_kws_(pcat, search_kws):
     """with great powers comes great responsibility"""
     for p in pcat.search(**search_kws).df.path:
-        rem_zarr(p)
+        rmrf(p)
     pcat.update()
-
-
-def create_cat_labels(ds):
-    exceptions = ["mip_era"]
-    for lab in [
-        "activity",
-        "domain",
-        "driving_experiment",
-        "driving_institution",
-        "driving_source",
-        #'experiment',
-        "frequency",
-        #'id',
-        "institution",
-        #'member',
-        "mip_era",
-        "source",
-        #'type',
-        "variable",
-        "xrfreq",
-    ]:
-        try:
-            ds.attrs[f"cat:{lab}"]
-
-        except:
-            if lab == "frequency":
-                ds.attrs[f"cat:{lab}"] = "day"
-            elif lab == "xrfreq":
-                ds.attrs[f"cat:{lab}"] = "D"
-            elif lab == "variable":
-                ds.attrs["cat:variable"] = ["tasmax", "tasmin", "pr"]
-            else:
-                if lab in exceptions:
-                    att = ds.attrs[lab]
-                else:
-                    att = ds.attrs[f"{lab}_id"]
-                ds.attrs[f"cat:{lab}"] = att
-    ds.attrs["cat:id"] = "_".join(
-        [
-            ds.attrs[f"cat:{lab}"]
-            for lab in ["mip_era", "source", "driving_experiment", "driving_source"]
-        ]
-    )
-    ds.attrs["cat:processing_level"] = "extracted"
-    return ds
-
-
-def intake_to_cat(ds):
-    for lab in [
-        "_data_format_",
-        "activity",
-        "domain",
-        "driving_model",
-        "experiment",
-        "frequency",
-        "id",
-        "institution",
-        "member",
-        "mip_era",
-        "processing_level",
-        "source",
-        "type",
-        "variable",
-        # 'version',
-        "xrfreq",
-        # 'date_start',
-        # 'date_end',
-        # 'path',
-    ]:
-        try:
-            ds.attrs[f"cat:{lab}"]
-        except:
-            if lab == "frequency":
-                ds.attrs[f"cat:{lab}"] = "day"
-            elif lab == "xrfreq":
-                ds.attrs[f"cat:{lab}"] = "D"
-            else:
-                try:
-                    ds.attrs[f"cat:{lab}"] = ds.attrs[f"intake_esm_attrs:{lab}"]
-                except:
-                    pass
-    return ds
 
 # =======================================================================================
 # saving utils
 # =======================================================================================
-def convert_cf_time(ds):
-    try:
-        ds["time"] = ds.indexes["time"].to_datetimeindex()
-    except:
-        ValueError
-    return ds
-
 def rem_encoding(ref):
     for v in ref.data_vars:
         try:
@@ -298,7 +111,7 @@ def rem_encoding(ref):
     return ref
 
 
-def rem_zarr(path):
+def rmrf(path):
     if os.path.exists(path):
         shutil.rmtree(path)
 
@@ -315,9 +128,6 @@ def rem_all_chunks(ds):
         except:
             pass
     return ds
-
-
-
 
 def move_then_delete(dirs_to_delete, moving_files, pcat):
     """
@@ -343,7 +153,6 @@ def move_then_delete(dirs_to_delete, moving_files, pcat):
         if dir_to_delete.exists() and dir_to_delete.is_dir():
             shutil.rmtree(dir_to_delete)
             os.mkdir(dir_to_delete)
-
 
 def save_move_update(
     ds,
@@ -378,6 +187,7 @@ def save_move_update(
         )
     shutil.move(init_path, final_path)
     pcat.update_from_ds(ds=ds, path=str(final_path), info_dict=info_dict)
+
 def save_tmp_update_path(
     ds,
     pcat,
@@ -395,7 +205,7 @@ def save_tmp_update_path(
         if os.path.exists(path) and overwrite is False:
             print(f"{path} already exists")
         else:        
-            rem_zarr(path)
+            rmrf(path)
         ds.to_zarr(path)
         return 
     tmp_dir, save_dir = save_kwargs["tmp_dir"], save_kwargs["save_dir"]
@@ -405,8 +215,8 @@ def save_tmp_update_path(
     if os.path.exists(final_path) and overwrite is False:
         print(f"{final_path} already exists")
     else:
-        rem_zarr(path)
-        rem_zarr(final_path)
+        rmrf(path)
+        rmrf(final_path)
         save_move_update(
             ds=ds,
             pcat=pcat,
@@ -414,38 +224,6 @@ def save_tmp_update_path(
             final_path=final_path,
             simple_saving=save_kwargs["simple_saving"],
         )
-
-
-def save_tmp_update_path0(
-    ds,
-    schemas,
-    pcat,
-    save_dir,
-    tmp_dir=None,
-    filename=None,
-    overwrite=False,
-    simple_saving=False,
-):
-    if filename is None:
-        filepath = xs.catutils.build_path(ds, schemas=schemas)
-    else:
-        filepath = filename
-    tmp_dir = tmp_dir or save_dir
-    path = f"{tmp_dir}/{filepath}.tmp.zarr"
-    final_path = path.replace(".tmp.", ".").replace(str(tmp_dir), str(save_dir))
-    if os.path.exists(final_path) and overwrite is False:
-        print(f"{final_path} already exists")
-    else:
-        rem_zarr(path)
-        rem_zarr(final_path)
-        save_move_update(
-            ds=ds,
-            pcat=pcat,
-            init_path=path,
-            final_path=final_path,
-            simple_saving=simple_saving,
-        )
-
 
 # =======================================================================================
 # combine DataArray utils
@@ -456,14 +234,12 @@ def cbc(dsl):
         ds = ds.combine_first(dsi)
     return ds
 
-
 def cbcl(dsl, lab="_combine_dim"):
     if isinstance(dsl, dict):
         out = cbc([ds.expand_dims({lab: [k]}) for k, ds in dsl.items()])
     if isinstance(dsl, list):
         out = cbc([ds.expand_dims({lab: [k]}) for k, ds in zip(*dsl)])
     return out
-
 
 def get_common_dict(dsl):
     ll = [list(i.attrs.keys()) for i in list(dsl)]
