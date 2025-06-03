@@ -35,7 +35,6 @@ def reload(mods=modules):
     for mod in mods.values():
         importlib.reload(mod)
     load_config(*cfgfiles, verbose=(__name__ == '__main__'), reset=True)
-    cfg = deepcopy(CONFIG)
 
 if not os.path.isfile(CONFIG["paths"]['project_catalog'])  or  "initialize_pcat" in CONFIG["tasks"]:
     pcat = ProjectCatalog.create(CONFIG["paths"]['project_catalog'], project=CONFIG['project'], overwrite=True)
