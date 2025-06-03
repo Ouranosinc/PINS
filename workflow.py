@@ -3,19 +3,17 @@
 #   jupytext:
 #     text_representation:
 #       extension: .py
-#       format_name: percent
-#       format_version: '1.3'
-#       jupytext_version: 1.17.1
+#       format_name: nomarker
+#       format_version: '1.0'
+#       jupytext_version: 1.16.1
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
 #     name: python3
 # ---
 
-# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Init
 
-# %%
 from xscen import ProjectCatalog, load_config,CONFIG
 import importlib 
 from pathlib import Path
@@ -54,13 +52,10 @@ sim_ids0  = CONFIG["selected_ids"]
 xrfreqs = set(pcat.search(processing_level="individual_indicator").df.xrfreq)
 
 
-# %%
 if __name__ == '__main__':
 
-# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Extract
 
-    # %%
     reload()
     if (task := "extract_reference") in CONFIG["tasks"]: 
         extract.main(pcat, CONFIG, task)
@@ -70,28 +65,22 @@ if __name__ == '__main__':
         sim_ids =  list(pcat.search(processing_level="extracted", type="simulation").df.id)
 
 
-# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Regrid
 
-    # %%
     reload()
     if (task := "regrid") in CONFIG["tasks"]: 
         for sim_id in sim_ids:
             regrid.main(pcat,CONFIG,task, wildcards= {"sim_id":sim_id})
 
-# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Rechunk
 
-    # %%
     reload()
     if (task := "rechunk") in CONFIG["tasks"]: 
         for sim_id in sim_ids:
             rechunk.main(pcat,CONFIG,task, wildcards={"sim_id":sim_id})
 
-# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Raw indicators
 
-    # %%
     # Maybe just restrict to SSS and SSE, currently all raw indicators are computed
     # Using these raw indicators, it is now possible to see which simulation have very bad seasonality 
     # and reject them. How it is done is shown in analysis.ipynb
@@ -104,37 +93,29 @@ if __name__ == '__main__':
         for sim_id, xrfreq in product(sim_ids+["ECMWF_ERA5-Land_NAM"], xrfreqs0):
             indicators.main(pcat,CONFIG, task, wildcards={"sim_id":sim_id, "xrfreq":xrfreq})
 
-# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Decay snow
 
-    # %%
     reload()
     if (task := "decay") in CONFIG["tasks"]: 
         for sim_id in sim_ids0:
             decay.main(pcat, CONFIG, task, wildcards={"sim_id":sim_id})
 
-# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Train
 
-    # %%
     reload()
     if (task := "train") in CONFIG["tasks"]:  
         for sim_id,var in product(sim_ids0, CONFIG[task]["variables"]):
             train.main(pcat, CONFIG, task,  wildcards={"sim_id":sim_id, "var":var})
 
-# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Adjust
 
-    # %%
     reload()
     if (task := "adjust") in CONFIG["tasks"]:  
         for sim_id,var in product(sim_ids0, CONFIG[task]["variables"]):
             adjust.main(pcat, CONFIG, task,  wildcards={"sim_id":sim_id, "var":var})
 
-# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Individual indicator
 
-    # %%
     reload()
     if (task := "individual_indicator") in CONFIG["tasks"]: 
         for sim_id in sim_ids0: 
@@ -142,30 +123,24 @@ if __name__ == '__main__':
         xrfreqs = set(pcat.search(processing_level="individual_indicator").df.xrfreq)
 
 
-# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Indicators
 
-    # %%
     reload()
     if (task := "indicators") in CONFIG["tasks"]: 
         for sim_id, xrfreq in product(sim_ids0, xrfreqs):
             indicators.main(pcat,CONFIG, task, wildcards={"sim_id":sim_id, "xrfreq":xrfreq})
 
-# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Climatology
 
-    # %%
     reload()
     if (task := "climatology") in CONFIG["tasks"]: 
         for sim_id, xrfreq in product(sim_ids0, xrfreqs):
             climatology.main(pcat,CONFIG, task, wildcards={"sim_id":sim_id, "xrfreq":xrfreq})
 
 
-# %% [markdown] jp-MarkdownHeadingCollapsed=true
 # # Ensemble
 
-    # %%
     reload()
     if (task := "ensemble") in CONFIG["tasks"]: 
         for xrfreq,experiment in product(xrfreqs,["rcp45"]): 
-            ensemble.main(pcat, CONFIG, task, wildcards={"experiment":experiment, "xrfreq":xrfreq, "experiment":experiment})
+            ensemble.main(pcat, CONFIG, task, wildcards={"experiment":experiment, "xrfreq":xrfreq})

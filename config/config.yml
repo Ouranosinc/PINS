@@ -16,7 +16,6 @@ cat_attrs:
 
 tasks:
 ####- initialize_pcat # only activate this task the first time you run the workflow to create the ProjectCatalog
-- makeref
 # - initialize_pcat
 - extract_reference
 - extract_simulation
@@ -100,7 +99,7 @@ extract_reference:
       snw: D
     periods: *ref_period
     other_search_criteria:
-      source: &ref_source "ERA5-Land"
+      source: &ref_source ERA5-Land
     data_catalogs: ${paths.catalogs}/reconstruction.json
     allow_conversion: True
     allow_resampling: False
@@ -251,11 +250,11 @@ decay:
     local_directory: *dask_dir
   io:
     input:
-      processing_level: "rechunked"
-      type: "simulation"
+      processing_level: rechunked
+      type: simulation
     output:
-      processing_level: "decayed"
-      type: "simulation"
+      processing_level: decayed
+      type: simulation
     wildcards: *wild_id
 
   decay_snow_season_end:
