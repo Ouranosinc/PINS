@@ -1,6 +1,26 @@
+from __future__ import annotations
 import utils as u
 import xscen as xs
 from copy import deepcopy
+import xclim 
+import xarray 
+import pins_utils as pu 
+
+# Maybe this will be part of xclim in the future
+# There is already a normal snw_season_length. 
+# Here, we needed to compute start/end with different frequencies, and 
+# and a suitable snw_season_length to go with this
+snw_season_length_twofreqs = xclim.indicators.land._snow.SnowWithIndexing(
+    identifier="snw_season_length_twofreqs",
+    units="days",
+    long_name="Snow cover duration",
+    description=(
+        "The duration of the snow season, starting with at least {window} days with snow amount above {thresh} "
+        "and ending with at least {window} days with snow amount under {thresh}."
+    ),
+    compute=pu.snw_season_length_twofreqs,
+)
+xclim.indicators.snw_season_length_twofreqs = snw_season_length_twofreqs
 
 def individual_indicator(ds, ind):
     attrs = deepcopy(ds.attrs)
@@ -20,6 +40,7 @@ def main(pcat,cfg,task,wildcards):
             })
         dd, cfg0 = u.dynamic_io(pcat,cfg, task, wildcards)
         out = individual_indicator(dd["input"],ind)
-        u.save_tmp_update_path(out, pcat, cfg=cfg0, task=task)
+    return out 
+        # u.save_tmp_update_path(out, pcat, cfg=cfg0, task=task)
 
         

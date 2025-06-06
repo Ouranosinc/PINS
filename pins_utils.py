@@ -1,5 +1,5 @@
 """ Utils specific to PINS """
-
+from __future__ import annotations
 import warnings
 from xclim.core.units import convert_units_to
 from xclim.indices import run_length as rl
@@ -7,6 +7,9 @@ import xarray as xr
 import numpy as np
 import pandas as pd
 from xclim.core import calendar
+from xclim.core.calendar import doy_to_days_since
+from xclim.indices import snw_season_end, snw_season_start
+import xclim
 
 def decay_snow_season_end(
     snw,
@@ -121,3 +124,81 @@ def timedelta_to_datetime(ds: xr.Dataset):
             if "timedelta" in str(ds[v].dtype):
                 ds[v] = ds[v].astype("datetime64[ns]")
         return ds
+
+
+def season_length_from_boundaries(
+    season_start: xr.DataArray,
+    season_end: xr.DataArray
+) -> xr.DataArray:
+    """
+    Season length using pre-computed boundaries.
+
+    Parameters
+    ----------
+    season_start: xr.DataArray
+        Day of year where the season starts.
+    season_end: xr.DataArray
+        Day of year where the season ends.
+    
+    Returns
+    -------
+    xr.DataArray, [dimensionless]
+        Length of the season
+    
+    Note
+    ----
+    If `season_start` and `season_end` are computed with different resampling frequencies, the time 
+    of `season_start` are selected to write the output.
+    """
+    days_since_start = calendar.doy_to_days_since(season_start,start=None)
+    days_since_end = calendar.doy_to_days_since(season_end,start=None)
+    days_since_end["time"] = days_since_start.time
+    doy_start = season_start.time.dt.dayofyear
+    doy_end = season_end.time.dt.dayofyear
+    # days_since we computed with the respective time arrays of season_start and season_end, 
+    # but now we will express the season_length using the times of season_start
+    doy_end["time"] = doy_start.time
+    out = (days_since_end  + doy_end - doy_start) - days_since_start
+    out.attrs.update(units="days")
+    return out
+
+def snw_season_length_twofreqs(
+    snw: xr.DataArray,
+    thresh: str = "4 kg m-2",
+    window: int = 14,
+    freq: str = "YS-AUG",
+    freq2: str = "YS-DEC",
+) -> xr.DataArray:
+    r"""
+    Snow cover duration (amount).
+
+    The season starts when the snow amount is above a threshold for at least `N` consecutive days
+    and stops when it drops below the same threshold for the same number of days.
+
+    Parameters
+    ----------
+    snw : xr.DataArray
+        Surface snow amount.
+    thresh : Quantified
+        Threshold snow amount.
+    window : int
+        Minimum number of days with snow amount above and below threshold.
+    freq : str
+        Resampling frequency of snow season start. The default value is chosen for the northern hemisphere.
+    freq2 : str
+        Resampling frequency of snow season end. The default value is chosen for the northern hemisphere.
+
+    Returns
+    -------
+    xr.DataArray, [days]
+        Length of the snow season.
+
+    References
+    ----------
+    :cite:cts:`chaumont_elaboration_2017`
+    """
+    sss = snw_season_start(snw, thresh, window, freq)
+    sse = snw_season_end(snw, thresh, window, freq2)
+    ssl = season_length_from_boundaries(sss, sse)
+    return ssl
+

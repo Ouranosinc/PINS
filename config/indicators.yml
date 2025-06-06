@@ -25,9 +25,10 @@ indicators:
       freq: YS-DEC
 
   snw_season_length:
-    base: snw_season_length_two_freqs
+    base: snw_season_length_twofreqs
     parameters:
       thresh: 4 kg m-2
       window: 14
       freq: YS-AUG
       freq2: YS-DEC
+

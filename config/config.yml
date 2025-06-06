@@ -17,33 +17,33 @@ cat_attrs:
 tasks:
 ####- initialize_pcat # only activate this task the first time you run the workflow to create the ProjectCatalog
 # - initialize_pcat
-- extract_reference
-- extract_simulation
-- regrid
-- rechunk
-- raw_individual_indicator
-- raw_indicators
-- decay
-- train
-- adjust
-- diagnostics
-- individual_indicator
-- indicators
-- climatology
-- ensemble
+  - extract_reference
+  - extract_simulation
+  - regrid
+  - rechunk
+  - raw_individual_indicator
+  - raw_indicators
+  - decay
+  - train
+  - adjust
+  - diagnostics
+  - individual_indicator
+  - indicators
+  - climatology
+  - ensemble
 
 
 selected_ids: 
- - 'CMIP5_CORDEX_MPI-M-MPI-ESM-LR_UQAM_UQAM-CRCM5_rcp45_r1i1p1_NAM-44',
- - 'CMIP5_MRCC5_CNRM-CM5_OURANOS_CRCM5_rcp45_r1i1p1_NAM-22',
- - 'CMIP5_MRCC5_GFDL-ESM2M_OURANOS_CRCM5_rcp45_r1i1p1_NAM-22',
- - 'CMIP5_MRCC5_MPI-ESM-LR_OURANOS_CRCM5_rcp45_r1i1p1_NAM-22',
- - 'CMIP5_MRCC5_CNRM-CM5_OURANOS_CRCM5_rcp85_r1i1p1_NAM-22',
- - 'CMIP5_MRCC5_GFDL-ESM2M_OURANOS_CRCM5_rcp85_r1i1p1_NAM-22',
- - 'CMIP5_CORDEX_MOHC-HadGEM2-ES_ISU_ISU-RegCM4_rcp85_r1i1p1_NAM-22',
- - 'CMIP5_CORDEX_MPI-M-MPI-ESM-LR_NCAR_NCAR-RegCM4_rcp85_r1i1p1_NAM-22',
- - 'CMIP5_MRCC5_MPI-ESM-LR_OURANOS_CRCM5_rcp85_r1i1p1_NAM-22',
- - 'CMIP5_CORDEX_NOAA-GFDL-GFDL-ESM2M_NCAR_WRF_rcp85_r1i1p1_NAM-22'
+  - CMIP5_CORDEX_MPI-M-MPI-ESM-LR_UQAM_UQAM-CRCM5_rcp45_r1i1p1_NAM-44
+  - CMIP5_MRCC5_CNRM-CM5_OURANOS_CRCM5_rcp45_r1i1p1_NAM-22
+  - CMIP5_MRCC5_GFDL-ESM2M_OURANOS_CRCM5_rcp45_r1i1p1_NAM-22
+  - CMIP5_MRCC5_MPI-ESM-LR_OURANOS_CRCM5_rcp45_r1i1p1_NAM-22
+  - CMIP5_MRCC5_CNRM-CM5_OURANOS_CRCM5_rcp85_r1i1p1_NAM-22
+  - CMIP5_MRCC5_GFDL-ESM2M_OURANOS_CRCM5_rcp85_r1i1p1_NAM-22
+  - CMIP5_CORDEX_MOHC-HadGEM2-ES_ISU_ISU-RegCM4_rcp85_r1i1p1_NAM-22
+  - CMIP5_CORDEX_MPI-M-MPI-ESM-LR_NCAR_NCAR-RegCM4_rcp85_r1i1p1_NAM-22
+  - CMIP5_MRCC5_MPI-ESM-LR_OURANOS_CRCM5_rcp85_r1i1p1_NAM-22
+  - CMIP5_CORDEX_NOAA-GFDL-GFDL-ESM2M_NCAR_WRF_rcp85_r1i1p1_NAM-2
 
 dask:
   client:
