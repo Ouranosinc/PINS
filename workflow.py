@@ -54,14 +54,6 @@ xrfreqs = set(pcat.search(processing_level="individual_indicator").df.xrfreq)
 
 if __name__ == '__main__':
 
-import xscen as xs 
-task = "individual_indicator"
-reload()
-cfg = CONFIG
-mod = xs.indicators.load_xclim_module(**cfg[task]["load_xclim_module"])
-for _, ind in mod.iter_indicators():
-    print(ind)
-
 # # Extract
 
     reload()
