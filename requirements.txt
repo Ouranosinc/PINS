@@ -1,6 +1,6 @@
 jupyter
 jupytext
+seaborn
 xclim 
 xsdba
-seaborn
-git+https://github.com/Ouranosinc/xscen.git@use_omegaconf
+xscen

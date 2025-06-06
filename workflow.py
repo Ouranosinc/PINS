@@ -5,7 +5,7 @@
 #       extension: .py
 #       format_name: nomarker
 #       format_version: '1.0'
-#       jupytext_version: 1.16.1
+#       jupytext_version: 1.17.1
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -21,6 +21,7 @@ from pathlib import Path
 import os 
 from copy import deepcopy
 from itertools import product
+from omegaconf import OmegaConf
 
 src_mods = ["extract", "rechunk", "regrid", "train", "adjust", "individual_indicator", "indicators", "climatology", "ensemble"]
 r_mods = [("src." + m,m) for m in src_mods] + [("utils","u"), ("pins_utils","pu")]
@@ -29,13 +30,17 @@ cfgfiles = ['config/paths.yml', "config/config.yml", "config/schemas.yml"]
 # load
 modules = {short_key:importlib.import_module(mod_name) for mod_name,short_key in r_mods}
 globals().update(modules)
-load_config(*cfgfiles, verbose=(__name__ == '__main__'), reset=True)
 
 def reload(mods=modules): 
-    global CONFIG,cfg
+    global CONFIG
     for mod in mods.values():
         importlib.reload(mod)
     load_config(*cfgfiles, verbose=(__name__ == '__main__'), reset=True)
+    cfg = dict(deepcopy(CONFIG))
+    cfg = OmegaConf.create(dict(cfg))
+    OmegaConf.resolve(cfg)
+    CONFIG.update(cfg) 
+reload()
 
 if not os.path.isfile(CONFIG["paths"]['project_catalog'])  or  "initialize_pcat" in CONFIG["tasks"]:
     pcat = ProjectCatalog.create(CONFIG["paths"]['project_catalog'], project=CONFIG['project'], overwrite=True)
