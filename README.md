@@ -82,13 +82,10 @@ Compute the indicators listed in `config/indicators.yml`.
 Ensemble of rcp45 and rcp85 simulations.
 
 
-## Performance
-
 ## Data availability and download
-A selection of indicators is made available directly in the Zenodo repository linked to the code repository.
+The daily timeseries and a selection of indicators is made available directly in the Zenodo repository linked to this code repository.
 
-The daily timeseries are available on Ouranos' PAVICS THREDDS server :
-- **TODO : Les urls**
+This data with all indicators computed for the project is also available on [Ouranos' PAVICS THREDDS server](https://pavics.ouranos.ca/twitcher/ows/proxy/thredds/catalog/birdhouse/ouranos/PINS/PINS_v1/catalog.html). Indicators computed over ERA5-Land are [available in another folder](https://pavics.ouranos.ca/twitcher/ows/proxy/thredds/catalog/birdhouse/ouranos/derived/reconstruction/ECMWF/ERA5-Land/catalog.html).
 
 ## References
 
