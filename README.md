@@ -46,7 +46,41 @@ The snow amount presents a strong seasonality which makes conventional bias-adju
 ## Data processing tools
 The code relies on [xscen](https://xscen.readthedocs.io/) for the workflow management, [xsdba](https://xsdba.readthedocs.io/) for the bias-adjustment and [xclim](https://xclim.readthedocs.io/) for the indicators calculations, three open-source python libraries maintained by Ouranos. All are built upon the packages xarray and dask for data handling and parallelization management.
 
-**TODO : Description sommaire du code, au minimum pour montrer ce qu'il manque à qqn qui voudrait le rouler.**
+## Summary of the workflow
+
+`workflow.py` is the main code used to extract, pre-process & adjust simulations. It also computes indicators, climatologies, ensembles. All important steps of the workflow have their own section. In `config/config.yml`, the configuration parameters of each section are listed.
+
+- extract_reference
+- extract_simulation
+This is the step where simulations are retrieved. Internally, we use a system of catalogs.
+
+- regrid
+All simulations are regridded to the resolution of the reference 
+
+- rechunk
+This is mainly to ensure that the time dimension has no dask chunks. This is required with the quantile-based functions used in `xsdba`. When working with a Dask client, this is a good place to choose strategic chunks that will work well with memory constraints.
+
+- raw_individual_indicator
+- raw_indicators
+The indicators are computed in the raw simulation and the reference. The `snw_season_start` and `snw_season_end` indicators are compared. Only simulations with a seasonality close enough to that of the reference are selected. See `analysis.ipynb` for more details. After this, the workflow should only be ran on selected simulations 
+
+- decay
+This adds small values of `snw` data in the end seasons. It ensures that the snow melting has an exponential decrease in the end season (instead of an abrupt season end). The values are not very signficiant, but they are helpful when performing the adjustment.
+
+- train
+- adjust
+Quantile Mapping performed, with a dayofyear grouping with a 15-day rolling window.
+
+- individual_indicator
+- indicators
+Compute the indicators listed in `config/indicators.yml`.
+
+- climatology
+30 years mean of the indicators.
+
+- ensemble
+Ensemble of rcp45 and rcp85 simulations.
+
 
 ## Performance
 
