@@ -32,3 +32,49 @@ indicators:
       freq: YS-AUG
       freq2: YS-DEC
 
+  no_snw_days_ann:
+    base: ResamplingIndicatorWithIndexing
+    realm: land
+    cf_attrs:
+      units: days
+      long_name: Days with no snow cover
+      description: "The {freq} number of days with snow depth below 4 kg/m²."
+    compute: count_occurrences
+    input:
+      data: snw
+    parameters:
+      threshold: 4 kg m-2
+      freq: AS-JUL
+      op: "<="
+
+  no_snw_days_mon:
+    base: ResamplingIndicatorWithIndexing
+    realm: land
+    cf_attrs:
+      units: days
+      long_name: Days with no snow cover
+      description: "The {freq} number of days with snow depth below 4 kg/m²."
+    compute: count_occurrences
+    input:
+      data: snw
+    parameters:
+      threshold: 4 kg m-2
+      freq: MS
+      op: "<="
+
+  no_snw_days_sea:
+    base: ResamplingIndicatorWithIndexing
+    realm: land
+    cf_attrs:
+      units: days
+      long_name: Days with no snow cover
+      description: "The {freq} number of days with snow depth below 4 kg/m²."
+    compute: count_occurrences
+    input:
+      data: snw
+    parameters:
+      threshold: 4 kg m-2
+      freq: QS-DEC
+      op: "<="
+
+
