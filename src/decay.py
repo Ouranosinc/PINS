@@ -1,4 +1,4 @@
-import pins_util    s as pu
+import pins_utils as pu
 
 def decay(ds, cfg, task):
     ds["snw"] = pu.decay_snow_season_end(ds.snw, **cfg[task]["decay_snow_season_end"])
