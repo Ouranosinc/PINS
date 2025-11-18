@@ -6,7 +6,7 @@ indicators:
       freq: YS-AUG
 
   snw_max_doy:
-    base: snw_max_doy_ufunc
+    base: snw_max_doy
     parameters:
       freq: YS-AUG
 
@@ -39,12 +39,13 @@ indicators:
       units: days
       long_name: Days with no snow cover
       description: "The {freq} number of days with snow depth below 4 kg/m²."
+      var_name: no_snw_days
     compute: count_occurrences
     input:
       data: snw
     parameters:
       threshold: 4 kg m-2
-      freq: AS-JUL
+      freq: YS-AUG
       op: "<="
 
   no_snw_days_mon:
@@ -54,6 +55,7 @@ indicators:
       units: days
       long_name: Days with no snow cover
       description: "The {freq} number of days with snow depth below 4 kg/m²."
+      var_name: no_snw_days
     compute: count_occurrences
     input:
       data: snw
@@ -69,6 +71,7 @@ indicators:
       units: days
       long_name: Days with no snow cover
       description: "The {freq} number of days with snow depth below 4 kg/m²."
+      var_name: no_snw_days
     compute: count_occurrences
     input:
       data: snw
