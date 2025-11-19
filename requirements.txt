@@ -1,6 +1,6 @@
 jupyter
 jupytext
 seaborn
-xclim 
+xclim >=0.58
 xsdba
 xscen
